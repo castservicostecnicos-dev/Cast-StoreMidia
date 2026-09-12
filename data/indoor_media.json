@@ -1,0 +1,354 @@
+{
+  "users": [
+    {
+      "id": "usr-admin-1",
+      "name": "Administrador Geral",
+      "email": "ale11062@gmail.com",
+      "password_hash": "7406ca56e2bd5cd93d3f6ea668b00c4f4c68c3dea5a13ce50a5554362c7a5e1121a410ca8c6e00af34f78ae49f3ed93b52ecbeea2bd78ea8b703f8d660f315c2",
+      "salt": "fc8a1154cf67cef20cef65e65ffd79b7",
+      "role": "admin",
+      "company_id": null,
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:03:00.000Z"
+    },
+    {
+      "id": "usr-comp-1",
+      "name": "Gerente Drogaria São Paulo",
+      "email": "empresa@drogariasp.com.br",
+      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
+      "salt": "6ced59bb1e78cf9f527c73152513ec28",
+      "role": "company",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "usr-op-1",
+      "name": "Carlos Atendimento",
+      "email": "operador@drogariasp.com.br",
+      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
+      "salt": "6ced59bb1e78cf9f527c73152513ec28",
+      "role": "operator",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "usr-play-1",
+      "name": "Player Recepção",
+      "email": "player1@drogariasp.com.br",
+      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
+      "salt": "6ced59bb1e78cf9f527c73152513ec28",
+      "role": "player",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "usr-play-2",
+      "name": "Player Caixa 02",
+      "email": "player2@drogariasp.com.br",
+      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
+      "salt": "6ced59bb1e78cf9f527c73152513ec28",
+      "role": "player",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "companies": [
+    {
+      "id": "comp-demo-1",
+      "legal_name": "Drogaria São Paulo S/A",
+      "trade_name": "Drogaria São Paulo - Matriz",
+      "cnpj": "61.412.110/0001-55",
+      "email": "contato@drogariasp.com.br",
+      "phone": "(11) 3345-8000",
+      "responsible": "Roberto Ferreira",
+      "address": "Av. Paulista, 1000",
+      "city": "São Paulo",
+      "state": "SP",
+      "plan_id": "plan-pro",
+      "start_date": "2026-01-01",
+      "due_date": "2027-01-01",
+      "status": "active",
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "plans": [
+    {
+      "id": "plan-basic",
+      "name": "Plano Básico",
+      "description": "Ideal para clínicas e pequenos estabelecimentos.",
+      "max_players": 2,
+      "max_operators": 2,
+      "max_storage": 50,
+      "monthly_price": 99,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:47:43.316Z"
+    },
+    {
+      "id": "plan-pro",
+      "name": "Plano Profissional",
+      "description": "Para médias empresas com múltiplos pontos de exibição.",
+      "max_players": 10,
+      "max_operators": 10,
+      "max_storage": 200,
+      "monthly_price": 209,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:46:13.231Z"
+    },
+    {
+      "id": "plan-enterprise",
+      "name": "Plano Empresarial",
+      "description": "Escala total com capacidade para redes e franquias.",
+      "max_players": 25,
+      "max_operators": 25,
+      "max_storage": 350,
+      "monthly_price": 309,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:47:18.654Z"
+    }
+  ],
+  "players": [
+    {
+      "id": "play-1",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-play-1",
+      "name": "PLAYER RECEPÇÃO",
+      "code": "PLAY-REC-01",
+      "location": "Hall de Entrada Principal",
+      "description": "Smart TV 55 polegadas na recepção principal.",
+      "orientation": "horizontal",
+      "playlist_id": "pl-1",
+      "status": "active",
+      "last_seen": "2026-09-03T11:43:03.408Z",
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "play-2",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-play-2",
+      "name": "PLAYER SALA 02 (TOTEM)",
+      "code": "PLAY-SALA-02",
+      "location": "Sala de Espera 02",
+      "description": "Totem digital vertical 9:16 na sala de espera.",
+      "orientation": "vertical",
+      "playlist_id": "pl-vert-1",
+      "status": "active",
+      "last_seen": "2026-09-03T10:29:04.697Z",
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "operators": [
+    {
+      "id": "op-1",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-op-1",
+      "name": "Carlos Atendimento",
+      "email": "operador@drogariasp.com.br",
+      "phone": "(11) 98765-4321",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "playlists": [
+    {
+      "id": "pl-1",
+      "company_id": "comp-demo-1",
+      "name": "Programação Recepção Geral",
+      "description": "Loop institucional com promoções e dicas de saúde.",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1",
+          "playlist_id": "pl-1",
+          "media_id": "med-1",
+          "position": 1,
+          "duration": 8,
+          "created_at": "2026-09-03T11:29:04.566Z"
+        },
+        {
+          "id": "pli-2",
+          "playlist_id": "pl-1",
+          "media_id": "med-2",
+          "position": 2,
+          "duration": 8,
+          "created_at": "2026-09-03T11:29:04.566Z"
+        },
+        {
+          "id": "pli-3",
+          "playlist_id": "pl-1",
+          "media_id": "med-3",
+          "position": 3,
+          "duration": 8,
+          "created_at": "2026-09-03T11:29:04.566Z"
+        }
+      ],
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "pl-vert-1",
+      "company_id": "comp-demo-1",
+      "name": "Programação Totem Vertical (9:16)",
+      "description": "Exibição otimizada para totens digitais e monitores verticais 1080x1920.",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-v-1",
+          "playlist_id": "pl-vert-1",
+          "media_id": "med-vert-1",
+          "position": 1,
+          "duration": 8,
+          "created_at": "2026-09-03T11:29:04.566Z"
+        },
+        {
+          "id": "pli-v-2",
+          "playlist_id": "pl-vert-1",
+          "media_id": "med-vert-2",
+          "position": 2,
+          "duration": 8,
+          "created_at": "2026-09-03T11:29:04.566Z"
+        }
+      ],
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "media": [
+    {
+      "id": "med-vert-1",
+      "company_id": "comp-demo-1",
+      "name": "Totem Promo - Dermocosméticos e Saúde (Vertical 9:16)",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1080 1920\" width=\"1080\" height=\"1920\"><defs><linearGradient id=\"bgv1\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%230f172a\"/><stop offset=\"50%\" stop-color=\"%231e3a8a\"/><stop offset=\"100%\" stop-color=\"%23091e3a\"/></linearGradient></defs><rect width=\"1080\" height=\"1920\" fill=\"url(%23bgv1)\"/><circle cx=\"900\" cy=\"350\" r=\"320\" fill=\"%232563eb\" opacity=\"0.2\"/><circle cx=\"150\" cy=\"1500\" r=\"280\" fill=\"%2338bdf8\" opacity=\"0.15\"/><rect x=\"80\" y=\"120\" width=\"360\" height=\"64\" rx=\"12\" fill=\"%232563eb\"/><text x=\"110\" y=\"162\" fill=\"%23ffffff\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DROGARIA SÃO PAULO</text><text x=\"80\" y=\"340\" fill=\"%2338bdf8\" font-size=\"42\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">FESTIVAL DE VERÃO</text><text x=\"80\" y=\"460\" fill=\"%23ffffff\" font-size=\"88\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">ATÉ 50% OFF</text><text x=\"80\" y=\"580\" fill=\"%2394a3b8\" font-size=\"36\" font-family=\"system-ui, sans-serif\">Protetores solares, hidratantes e dermocosméticos selecionados.</text><g transform=\"translate(80, 720)\"><rect width=\"920\" height=\"340\" rx=\"24\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"3\"/><text x=\"50\" y=\"90\" fill=\"%2338bdf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">OFERTA ESPECIAL DA SEMANA</text><text x=\"50\" y=\"160\" fill=\"%23ffffff\" font-size=\"52\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Compre 2 Leve 3</text><text x=\"50\" y=\"230\" fill=\"%23cbd5e1\" font-size=\"30\" font-family=\"system-ui, sans-serif\">Linha facial completa com desconto direto no caixa.</text></g><g transform=\"translate(80, 1150)\"><rect width=\"920\" height=\"420\" rx=\"24\" fill=\"%23111827\" stroke=\"%232563eb\" stroke-width=\"2\"/><circle cx=\"100\" cy=\"100\" r=\"40\" fill=\"%232563eb\"/><text x=\"88\" y=\"112\" fill=\"%23ffffff\" font-size=\"32\" font-weight=\"bold\">✓</text><text x=\"170\" y=\"95\" fill=\"%23ffffff\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Programa Fidelidade Drogarias</text><text x=\"170\" y=\"145\" fill=\"%2394a3b8\" font-size=\"28\" font-family=\"system-ui, sans-serif\">Cadastre seu CPF e acumule pontos a cada compra</text><rect x=\"50\" y=\"230\" width=\"820\" height=\"120\" rx=\"16\" fill=\"%231e3a8a\"/><text x=\"80\" y=\"305\" fill=\"%23ffffff\" font-size=\"32\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Consulte nosso farmacêutico de plantão</text></g><text x=\"80\" y=\"1740\" fill=\"%2364748b\" font-size=\"24\" font-family=\"system-ui, sans-serif\">FORMATO VERTICAL 9:16 (1080x1920) • TOTEM DIGITAL</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "med-vert-2",
+      "company_id": "comp-demo-1",
+      "name": "Totem Saúde - Vacinação e Exames (Vertical 9:16)",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1080 1920\" width=\"1080\" height=\"1920\"><defs><linearGradient id=\"bgv2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23064e3b\"/><stop offset=\"50%\" stop-color=\"%23022c22\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1080\" height=\"1920\" fill=\"url(%23bgv2)\"/><circle cx=\"200\" cy=\"350\" r=\"320\" fill=\"%23059669\" opacity=\"0.2\"/><rect x=\"80\" y=\"120\" width=\"340\" height=\"64\" rx=\"12\" fill=\"%2310b981\"/><text x=\"110\" y=\"162\" fill=\"%23ffffff\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ESPAÇO SAÚDE</text><text x=\"80\" y=\"340\" fill=\"%2334d399\" font-size=\"42\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">CAMPANHA NACIONAL</text><text x=\"80\" y=\"460\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">VACINAÇÃO DA GRIPE</text><text x=\"80\" y=\"580\" fill=\"%23a7f3d0\" font-size=\"36\" font-family=\"system-ui, sans-serif\">Disponível para todas as idades com aplicação rápida.</text><g transform=\"translate(80, 720)\"><rect width=\"920\" height=\"360\" rx=\"24\" fill=\"%23065f46\" stroke=\"%23047857\" stroke-width=\"3\"/><text x=\"50\" y=\"90\" fill=\"%236ee7b7\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">HORÁRIO DE ATENDIMENTO</text><text x=\"50\" y=\"160\" fill=\"%23ffffff\" font-size=\"48\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Segunda a Sábado: 08h às 21h</text><text x=\"50\" y=\"230\" fill=\"%23e6fcf5\" font-size=\"32\" font-family=\"system-ui, sans-serif\">Domingos e Feriados: 09h às 18h</text><text x=\"50\" y=\"300\" fill=\"%23a7f3d0\" font-size=\"28\" font-family=\"system-ui, sans-serif\">Guichê 03 • Sem necessidade de agendamento</text></g><g transform=\"translate(80, 1160)\"><rect width=\"920\" height=\"420\" rx=\"24\" fill=\"%23111827\" stroke=\"%2310b981\" stroke-width=\"2\"/><text x=\"60\" y=\"90\" fill=\"%2334d399\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">SERVIÇOS FARMACÊUTICOS</text><text x=\"60\" y=\"160\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Aferição de Pressão Arterial</text><text x=\"60\" y=\"220\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Teste de Glicemia Capilar</text><text x=\"60\" y=\"280\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Aplicação de Injetáveis com Receita</text><text x=\"60\" y=\"340\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Bioimpedância e Orientação Nutricional</text></g><text x=\"80\" y=\"1740\" fill=\"%236ee7b7\" font-size=\"24\" font-family=\"system-ui, sans-serif\">FORMATO VERTICAL 9:16 (1080x1920) • TOTEM DIGITAL</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "med-1",
+      "company_id": "comp-demo-1",
+      "name": "Ofertas da Semana - Até 40% OFF",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%230f172a\"/><stop offset=\"100%\" stop-color=\"%231e3a8a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg)\"/><circle cx=\"1600\" cy=\"250\" r=\"380\" fill=\"%232563eb\" opacity=\"0.15\"/><circle cx=\"200\" cy=\"900\" r=\"300\" fill=\"%2338bdf8\" opacity=\"0.1\"/><rect x=\"120\" y=\"100\" width=\"220\" height=\"48\" rx=\"8\" fill=\"%232563eb\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DROGARIA SÃO PAULO</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">SEMANA DA SAÚDE E BEM-ESTAR</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">ATÉ 40% DE DESCONTO</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Em medicamentos selecionados, dermocosméticos e vitaminas.</text><rect x=\"120\" y=\"640\" width=\"560\" height=\"180\" rx=\"16\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"710\" fill=\"%2338bdf8\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CONSULTE NOSSO FARMACÊUTICO</text><text x=\"160\" y=\"760\" fill=\"%23cbd5e1\" font-size=\"22\" font-family=\"system-ui, sans-serif\">Aferição de pressão e testes rápidos disponíveis no guichê 2.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "med-2",
+      "company_id": "comp-demo-1",
+      "name": "Horário de Atendimento e Delivery",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23091e3a\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg2)\"/><rect x=\"120\" y=\"100\" width=\"220\" height=\"48\" rx=\"8\" fill=\"%2310b981\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ATENDIMENTO 24 HORAS</text><text x=\"120\" y=\"320\" fill=\"%2334d399\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">COMODIDADE PARA VOCÊ</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"78\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">RECEBA SEUS MEDICAMENTOS EM CASA</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Peça pelo WhatsApp oficial ou aplicativo com entrega expressa em até 45 minutos.</text><g transform=\"translate(120, 650)\"><rect width=\"450\" height=\"140\" rx=\"12\" fill=\"%231e293b\"/><text x=\"40\" y=\"60\" fill=\"%2338bdf8\" font-size=\"22\" font-family=\"system-ui, sans-serif\">WHATSAPP OFICIAL</text><text x=\"40\" y=\"105\" fill=\"%23ffffff\" font-size=\"32\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">(11) 98765-0000</text></g></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "med-3",
+      "company_id": "comp-demo-1",
+      "name": "Dica de Saúde - Hidratação Diária",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg3\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23172554\"/><stop offset=\"100%\" stop-color=\"%231e293b\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg3)\"/><rect x=\"120\" y=\"100\" width=\"180\" height=\"48\" rx=\"8\" fill=\"%230284c7\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DICA DE SAÚDE</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CUIDE DO SEU CORPO</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"80\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">VOCÊ JÁ BEBEU ÁGUA HOJE?</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">A hidratação regular melhora a disposição, circulação e o funcionamento renal.</text><rect x=\"120\" y=\"650\" width=\"700\" height=\"140\" rx=\"14\" fill=\"%230f172a\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"715\" fill=\"%2338bdf8\" font-size=\"24\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">RECOMENDAÇÃO MÉDICA</text><text x=\"160\" y=\"755\" fill=\"%23e2e8f0\" font-size=\"20\" font-family=\"system-ui, sans-serif\">Consuma no mínimo 2 litros de água filtrada ao longo do dia.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "rss_feeds": [
+    {
+      "id": "rss-1",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "call_phrases": [
+    {
+      "id": "phr-1",
+      "company_id": "comp-demo-1",
+      "operator_id": "op-1",
+      "phrase": "Cliente, favor dirigir-se ao atendimento.",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "phr-2",
+      "company_id": "comp-demo-1",
+      "operator_id": "op-1",
+      "phrase": "Senha 25, dirigir-se ao caixa 03.",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "phr-3",
+      "company_id": "comp-demo-1",
+      "operator_id": "op-1",
+      "phrase": "Favor comparecer à recepção.",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "phr-4",
+      "company_id": "comp-demo-1",
+      "operator_id": "op-1",
+      "phrase": "Próximo atendimento, guichê 01.",
+      "active": true,
+      "created_at": "2026-09-03T11:29:04.566Z",
+      "updated_at": "2026-09-03T11:29:04.566Z"
+    }
+  ],
+  "player_calls": [
+    {
+      "id": "call-1788506383051",
+      "company_id": "comp-demo-1",
+      "player_id": "play-1",
+      "operator_id": "usr-op-1",
+      "phrase_id": null,
+      "phrase": "Senha 25, dirigir-se ao caixa 03.",
+      "duration": 10,
+      "created_at": "2026-09-04T07:19:43.051Z"
+    }
+  ]
+}

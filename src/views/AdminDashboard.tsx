@@ -1,0 +1,1830 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Building2,
+  Layers,
+  Monitor,
+  Plus,
+  CheckCircle,
+  XCircle,
+  KeyRound,
+  Edit2,
+  Power,
+  Shield,
+  Tv,
+  Radio,
+  ArrowRight,
+  Copy,
+  Check,
+  ExternalLink,
+  Sparkles,
+  Search,
+  X,
+  Filter,
+  FileSpreadsheet,
+  UploadCloud,
+} from 'lucide-react';
+import { api } from '../lib/api';
+import { Company, Plan, AdminStats } from '../types';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
+
+interface AdminDashboardProps {
+  showToast: (type: 'success' | 'error' | 'info', message: string) => void;
+  onLogout: () => void;
+  onQuickSwitchRole?: (role: 'admin' | 'company' | 'operator' | 'player') => void;
+  onOpenPlayerSimulation?: (code: string) => void;
+  onOpenPresentation?: () => void;
+}
+
+const PLAN_TEMPLATES = [
+  {
+    type: 'call',
+    name: 'Call Básico',
+    description: '1 tela com chamadas no painel e até 4 operadores de atendimento (proporção 4:1).',
+    max_players: 1,
+    max_operators: 4,
+    max_storage: 50,
+    monthly_price: 49,
+    tag: 'R$ 49 | 1 Tela | 4 Op',
+  },
+  {
+    type: 'call',
+    name: 'Call Intermediário',
+    description: '3 telas com chamadas no painel e até 12 operadores de atendimento (proporção 4:1).',
+    max_players: 3,
+    max_operators: 12,
+    max_storage: 150,
+    monthly_price: 109,
+    tag: 'R$ 109 | 3 Telas | 12 Op',
+  },
+  {
+    type: 'call',
+    name: 'Call Pro',
+    description: '6 telas com chamadas simultâneas e até 24 operadores de atendimento (proporção 4:1).',
+    max_players: 6,
+    max_operators: 24,
+    max_storage: 300,
+    monthly_price: 229,
+    tag: 'R$ 229 | 6 Telas | 24 Op',
+  },
+  {
+    type: 'show',
+    name: 'Show Básico',
+    description: 'Exibição de mídia indoor, propagandas, hora certa e notícias RSS em até 2 telas (sem operador).',
+    max_players: 2,
+    max_operators: 0,
+    max_storage: 50,
+    monthly_price: 29,
+    tag: 'R$ 29 | 2 Telas | 0 Op',
+  },
+  {
+    type: 'show',
+    name: 'Show Intermediário',
+    description: 'Até 5 telas simultâneas com notícias e mídias institucionais sem operadores.',
+    max_players: 5,
+    max_operators: 0,
+    max_storage: 150,
+    monthly_price: 89,
+    tag: 'R$ 89 | 5 Telas | 0 Op',
+  },
+  {
+    type: 'show',
+    name: 'Show Pro',
+    description: 'Até 12 telas para redes e múltiplos pontos comerciais sem operadores.',
+    max_players: 12,
+    max_operators: 0,
+    max_storage: 500,
+    monthly_price: 149,
+    tag: 'R$ 149 | 12 Telas | 0 Op',
+  },
+];
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  showToast,
+  onLogout,
+  onQuickSwitchRole,
+  onOpenPlayerSimulation,
+  onOpenPresentation,
+}) => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'companies' | 'plans' | 'drive'>('dashboard');
+  const [stats, setStats] = useState<AdminStats>({
+    totalCompanies: 0,
+    activeCompanies: 0,
+    inactiveCompanies: 0,
+    totalPlayers: 0,
+  });
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals
+  const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+
+  // Password reset modal
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetCompanyId, setResetCompanyId] = useState<string | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+
+  // Confirmation modal
+  const [confirmData, setConfirmData] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    action: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: () => {},
+  });
+
+  // Search and filter for companies (Mobile and Desktop)
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  // Company Form state
+  const [companyForm, setCompanyForm] = useState({
+    legal_name: '',
+    trade_name: '',
+    cnpj: '',
+    email: '',
+    phone: '',
+    responsible: '',
+    address: '',
+    city: '',
+    state: '',
+    plan_id: '',
+    start_date: new Date().toISOString().split('T')[0],
+    due_date: '',
+    password: '',
+  });
+
+  // Plan Form state
+  const [planForm, setPlanForm] = useState<{
+    name: string;
+    description: string;
+    max_players: number | string;
+    max_operators: number | string;
+    max_storage: number | string;
+    monthly_price: number | string;
+  }>({
+    name: '',
+    description: '',
+    max_players: 2,
+    max_operators: 0,
+    max_storage: 50,
+    monthly_price: 49,
+  });
+  const [planWithoutOperator, setPlanWithoutOperator] = useState(false);
+  const [autoCalcRatio, setAutoCalcRatio] = useState(true);
+
+  // Copied Key State for visual feedback
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, key: string, label: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      }
+      setCopiedKey(key);
+      showToast('success', `${label} copiado!`);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      showToast('info', `${label}: ${text}`);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [s, c, p] = await Promise.all([
+        api.getAdminStats(),
+        api.getCompanies(),
+        api.getPlans(),
+      ]);
+      setStats(s);
+      setCompanies(c);
+      setPlans(p);
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao carregar dados do painel.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleOpenCompanyModal = (company?: Company) => {
+    if (company) {
+      setEditingCompany(company);
+      setCompanyForm({
+        legal_name: company.legal_name,
+        trade_name: company.trade_name,
+        cnpj: company.cnpj,
+        email: company.email,
+        phone: company.phone || '',
+        responsible: company.responsible || '',
+        address: company.address || '',
+        city: company.city || '',
+        state: company.state || '',
+        plan_id: company.plan_id,
+        start_date: company.start_date || '',
+        due_date: company.due_date || '',
+        password: '',
+      });
+    } else {
+      setEditingCompany(null);
+      setCompanyForm({
+        legal_name: '',
+        trade_name: '',
+        cnpj: '',
+        email: '',
+        phone: '',
+        responsible: '',
+        address: '',
+        city: '',
+        state: '',
+        plan_id: plans[0]?.id || '',
+        start_date: new Date().toISOString().split('T')[0],
+        due_date: '',
+        password: '',
+      });
+    }
+    setCompanyModalOpen(true);
+  };
+
+  const handleSaveCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCompany) {
+        await api.updateCompany(editingCompany.id, companyForm);
+        showToast('success', 'Empresa atualizada com sucesso.');
+      } else {
+        await api.createCompany(companyForm);
+        showToast('success', 'Empresa cadastrada com sucesso.');
+      }
+      setCompanyModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao salvar empresa.');
+    }
+  };
+
+  const handleToggleCompany = (company: Company) => {
+    const isActivating = company.status === 'inactive';
+    setConfirmData({
+      isOpen: true,
+      title: isActivating ? 'Ativar Empresa' : 'Desativar Empresa',
+      message: isActivating
+        ? `Deseja ativar a empresa ${company.trade_name}? Seus players voltarão a operar.`
+        : `Deseja desativar a empresa ${company.trade_name}? Uma empresa inativa não poderá operar seus players.`,
+      action: async () => {
+        try {
+          const res = await api.toggleCompanyStatus(company.id);
+          showToast('success', res.message);
+          setConfirmData((prev) => ({ ...prev, isOpen: false }));
+          loadData();
+        } catch (err: any) {
+          showToast('error', err.message);
+        }
+      },
+    });
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetCompanyId) return;
+    try {
+      const res = await api.resetCompanyPassword(resetCompanyId, newPasswordInput || undefined);
+      showToast('success', res.message);
+      setResetModalOpen(false);
+      setNewPasswordInput('');
+    } catch (err: any) {
+      showToast('error', err.message);
+    }
+  };
+
+  const handleOpenPlanModal = (plan?: Plan) => {
+    if (plan) {
+      setEditingPlan(plan);
+      setPlanForm({
+        name: plan.name,
+        description: plan.description,
+        max_players: plan.max_players,
+        max_operators: plan.max_operators,
+        max_storage: plan.max_storage,
+        monthly_price: plan.monthly_price,
+      });
+      const isZeroOp = Number(plan.max_operators) === 0;
+      setPlanWithoutOperator(isZeroOp);
+      setAutoCalcRatio(!isZeroOp && Number(plan.max_operators) === Number(plan.max_players) * 4);
+    } else {
+      setEditingPlan(null);
+      // Default to Call Básico preset (1 tela, 4 operadores)
+      setPlanForm({
+        name: 'Call Básico',
+        description: '1 tela com chamadas no painel e até 4 operadores de atendimento (proporção 4:1).',
+        max_players: 1,
+        max_operators: 4,
+        max_storage: 50,
+        monthly_price: 49,
+      });
+      setPlanWithoutOperator(false);
+      setAutoCalcRatio(true);
+    }
+    setPlanModalOpen(true);
+  };
+
+  const handleApplyPlanTemplate = (tpl: (typeof PLAN_TEMPLATES)[0]) => {
+    setPlanForm({
+      name: tpl.name,
+      description: tpl.description,
+      max_players: tpl.max_players,
+      max_operators: tpl.max_operators,
+      max_storage: tpl.max_storage,
+      monthly_price: tpl.monthly_price,
+    });
+    setPlanWithoutOperator(tpl.type === 'show');
+    setAutoCalcRatio(tpl.type === 'call');
+    showToast('info', `Modelo "${tpl.name}" carregado com sucesso.`);
+  };
+
+  const handleSavePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      ...planForm,
+      max_players: Math.max(1, Number(planForm.max_players) || 1),
+      max_operators: planWithoutOperator ? 0 : Math.max(0, Number(planForm.max_operators) || 0),
+      max_storage: Math.max(1, Number(planForm.max_storage) || 1),
+      monthly_price: Math.max(0, Number(planForm.monthly_price) || 0),
+    };
+    try {
+      if (editingPlan) {
+        await api.updatePlan(editingPlan.id, payload);
+        showToast('success', 'Plano atualizado com sucesso.');
+      } else {
+        await api.createPlan(payload);
+        showToast('success', 'Plano criado com sucesso.');
+      }
+      setPlanModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      showToast('error', err.message);
+    }
+  };
+
+  const handleTogglePlan = async (plan: Plan) => {
+    try {
+      const res = await api.togglePlanStatus(plan.id);
+      showToast('success', res.message);
+      loadData();
+    } catch (err: any) {
+      showToast('error', err.message);
+    }
+  };
+
+  const filteredCompanies = companies.filter((c) => {
+    const term = companySearch.toLowerCase().trim();
+    const matchesSearch =
+      !term ||
+      c.trade_name.toLowerCase().includes(term) ||
+      c.legal_name.toLowerCase().includes(term) ||
+      c.cnpj.toLowerCase().includes(term) ||
+      c.email.toLowerCase().includes(term) ||
+      (c.responsible && c.responsible.toLowerCase().includes(term));
+    const matchesStatus =
+      companyStatusFilter === 'all' ||
+      (companyStatusFilter === 'active' && c.status === 'active') ||
+      (companyStatusFilter === 'inactive' && c.status !== 'active');
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="mx-auto max-w-7xl px-3.5 sm:px-8 py-5 sm:py-8">
+      {/* Subheader / Tabs com scroll horizontal suave em telas pequenas */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-5 mb-6 sm:mb-8">
+        <div>
+          <h2 className="text-xl sm:text-3xl font-light text-white tracking-tight">Visão Geral Administrativa</h2>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">Acompanhamento central de empresas, planos e operações globais</p>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1 sm:pb-0">
+          <button
+            id="tab-admin-dashboard"
+            onClick={() => setActiveTab('dashboard')}
+            className={`shrink-0 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+              activeTab === 'dashboard'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            Dashboard
+          </button>
+          <button
+            id="tab-admin-companies"
+            onClick={() => setActiveTab('companies')}
+            className={`shrink-0 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+              activeTab === 'companies'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            Empresas ({companies.length})
+          </button>
+          <button
+            id="tab-admin-plans"
+            onClick={() => setActiveTab('plans')}
+            className={`shrink-0 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+              activeTab === 'plans'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            Planos ({plans.length})
+          </button>
+          <button
+            id="tab-admin-drive"
+            onClick={() => setActiveTab('drive')}
+            className={`shrink-0 flex items-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+              activeTab === 'drive'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <UploadCloud className="h-3.5 w-3.5 text-blue-400" />
+            <span>Google Drive & Arquivos</span>
+          </button>
+
+          {onOpenPresentation && (
+            <button
+              type="button"
+              onClick={onOpenPresentation}
+              className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-sm transition cursor-pointer border border-blue-500/40"
+              title="Abrir Apresentação Comercial / Exportar PDF para Clientes"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Apresentação Comercial (PDF)</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* VIEW: DASHBOARD MINIMALISTA */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-8">
+          {/* 3 Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Empresas Ativas
+                </span>
+                <CheckCircle className="h-5 w-5 text-emerald-400" />
+              </div>
+              <p className="mt-3 text-4xl font-light text-white">{stats.activeCompanies}</p>
+              <div className="mt-4 flex items-center text-xs text-emerald-400 font-medium gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                <span>Empresas em operação regular</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Empresas Inativas
+                </span>
+                <XCircle className="h-5 w-5 text-rose-400" />
+              </div>
+              <p className="mt-3 text-4xl font-light text-white">{stats.inactiveCompanies}</p>
+              <div className="mt-4 flex items-center text-xs text-rose-400/80 font-medium gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                <span>Acesso suspenso ou bloqueado</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  Total de Players
+                </span>
+                <Monitor className="h-5 w-5 text-blue-400" />
+              </div>
+              <p className="mt-3 text-4xl font-light text-white">{stats.totalPlayers}</p>
+              <div className="mt-4 flex items-center text-xs text-blue-400 font-medium gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span>Dispositivos conectados na rede</span>
+              </div>
+            </div>
+          </div>
+
+          {/* APRESENTAÇÃO COMERCIAL & PROPOSTA PDF (KIT DE VENDAS DO DEV/ADMIN) */}
+          <div className="rounded-xl border border-indigo-900/60 bg-gradient-to-br from-slate-800/95 via-indigo-950/30 to-slate-800/95 p-6 shadow-lg">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shrink-0">
+                  <FileSpreadsheet className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                      Apresentação Comercial Executiva (Kit de Vendas em PDF)
+                    </h3>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-900/60 border border-indigo-700/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                      <Sparkles className="h-3 w-3 text-indigo-400" />
+                      Pronto para Apresentar
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                    Material comercial com 7 slides em alta resolução: dores do cliente, comparação com painéis antigos de LED, arquitetura em nuvem, planos SHOW vs. CALL (com proporção 4:1 de operadores), diferenciais de voz natural e requisitos simples de instalação.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                {onOpenPresentation && (
+                  <button
+                    type="button"
+                    onClick={onOpenPresentation}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition shadow-md cursor-pointer hover:shadow-blue-500/20"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span>Abrir Apresentação & Baixar PDF</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Mini preview dos tópicos da apresentação */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-700/70">
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                <span className="text-[10px] font-bold uppercase text-indigo-400">Slide 1-2</span>
+                <p className="font-semibold text-white mt-0.5">Dores & Capa</p>
+                <p className="text-[11px] text-slate-400">Fim de esperas cansativas e TVs desatualizadas</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                <span className="text-[10px] font-bold uppercase text-indigo-400">Slide 3-4</span>
+                <p className="font-semibold text-white mt-0.5">Operação & Planos</p>
+                <p className="text-[11px] text-slate-400">Plano SHOW (Mídia) vs CALL (Voz + Senhas)</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-indigo-400/20 text-xs">
+                <span className="text-[10px] font-bold uppercase text-emerald-400">Slide 5-6</span>
+                <p className="font-semibold text-white mt-0.5">Diferenciais Técnicos</p>
+                <p className="text-[11px] text-slate-400">Voz natural sem gravações e setup em 15min</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                <span className="text-[10px] font-bold uppercase text-amber-400">Slide 7</span>
+                <p className="font-semibold text-white mt-0.5">Fechamento & Proposta</p>
+                <p className="text-[11px] text-slate-400">Personalizado com os dados do cliente</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Acessos Rápidos do Sistema (Exclusivo Admin Geral) */}
+          <div className="rounded-xl border border-blue-900/50 bg-slate-800/95 p-6 shadow-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                      Acessos Rápidos do Sistema
+                    </h3>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-900/60 border border-blue-700/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                      <Sparkles className="h-3 w-3 text-blue-400" />
+                      Privativo do Admin Geral
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Acessos rápidos de teste transferidos com segurança da tela de login para controle exclusivo do Administrador Geral.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {/* 1. Admin Geral */}
+              <div className="rounded-xl border border-purple-800/40 bg-purple-950/20 p-5 flex flex-col justify-between hover:border-purple-700/60 transition">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-900/60 text-purple-300 border border-purple-700/60">
+                      Sessão Ativa
+                    </span>
+                    <Shield className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">1. Admin Geral</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Painel mestre para administração global de clientes, planos e cotas.
+                  </p>
+
+                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                      <span className="font-semibold text-purple-300 select-all truncate ml-2">ale11062@gmail.com</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                      <span className="text-emerald-400 font-bold select-all">Admin@123456</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-purple-900/40 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText('ale11062@gmail.com\nAdmin@123456', 'admin_cred', 'Credenciais do Admin')}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-purple-800/60 bg-purple-900/30 hover:bg-purple-900/50 text-purple-200 text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                  >
+                    {copiedKey === 'admin_cred' ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>Copiar Credenciais</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Empresa */}
+              <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-5 flex flex-col justify-between hover:border-blue-700/60 transition">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60">
+                      Painel da Empresa
+                    </span>
+                    <Building2 className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Empresa</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Drogarias SP • Gestão de mídias, playlists, telas e notícias RSS.
+                  </p>
+
+                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                      <span className="font-semibold text-blue-300 select-all truncate ml-2">empresa@drogariasp.com.br</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                      <span className="text-slate-200 font-bold select-all">123456</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-blue-900/40 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onQuickSwitchRole?.('company')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                  >
+                    <span>Entrar Empresa</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText('empresa@drogariasp.com.br\n123456', 'company_cred', 'Credenciais da Empresa')}
+                    title="Copiar dados"
+                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                  >
+                    {copiedKey === 'company_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Operador */}
+              <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 flex flex-col justify-between hover:border-emerald-700/60 transition">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/60">
+                      Painel Operacional
+                    </span>
+                    <Radio className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operador</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Balcão • Chamada por voz na TV, fila preferencial e frases fixas.
+                  </p>
+
+                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                      <span className="font-semibold text-emerald-300 select-all truncate ml-2">operador@drogariasp.com.br</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                      <span className="text-slate-200 font-bold select-all">123456</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-emerald-900/40 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onQuickSwitchRole?.('operator')}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                  >
+                    <span>Entrar Operador</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText('operador@drogariasp.com.br\n123456', 'operator_cred', 'Credenciais do Operador')}
+                    title="Copiar dados"
+                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                  >
+                    {copiedKey === 'operator_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Player TV */}
+              <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-5 flex flex-col justify-between hover:border-amber-700/60 transition">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/60">
+                      Reprodução Ao Vivo
+                    </span>
+                    <Tv className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. Player (TV)</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Terminal receptor • Notícias RSS, hora, clima em tempo real e chamadas.
+                  </p>
+
+                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Código TV:</span>
+                      <span className="font-bold text-amber-300 select-all tracking-wider">PLAY-REC-01</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="text-slate-500 text-[10px] uppercase">Local:</span>
+                      <span className="text-slate-300 truncate">Balcão Principal</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenPlayerSimulation) {
+                        onOpenPlayerSimulation('PLAY-REC-01');
+                      } else if (onQuickSwitchRole) {
+                        onQuickSwitchRole('player');
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
+                  >
+                    <span>Abrir Player</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText('PLAY-REC-01', 'player_code', 'Código do Player')}
+                    title="Copiar código"
+                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                  >
+                    {copiedKey === 'player_code' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Atalhos Rápidos */}
+          <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">Atalhos Principais</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button
+                onClick={() => setActiveTab('companies')}
+                className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-700 bg-slate-800/90 hover:bg-slate-750 hover:border-slate-600 transition cursor-pointer text-left group"
+              >
+                <div className="p-2.5 rounded-lg bg-blue-600/20 text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Gerenciar Empresas</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">Cadastrar, editar e monitorar planos</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('plans')}
+                className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-700 bg-slate-800/90 hover:bg-slate-750 hover:border-slate-600 transition cursor-pointer text-left group"
+              >
+                <div className="p-2.5 rounded-lg bg-purple-600/20 text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Gerenciar Planos</h4>
+                  <p className="text-xs text-slate-400 mt-0.5">Definir cotas e limites operacionais</p>
+                </div>
+              </button>
+
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-3.5 p-4 rounded-xl border border-rose-900/40 bg-rose-950/20 hover:bg-rose-950/40 transition cursor-pointer text-left"
+              >
+                <div className="p-2.5 rounded-lg bg-rose-600/20 text-rose-400">
+                  <Power className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-rose-200">Encerrar Sessão</h4>
+                  <p className="text-xs text-rose-400/80 mt-0.5">Sair com segurança do sistema</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: EMPRESAS */}
+      {activeTab === 'companies' && (
+        <div className="space-y-4 sm:space-y-6">
+          {/* Header e Ações */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Empresas Contratantes</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Gerenciamento cadastral, limites operacionais e assinaturas</p>
+            </div>
+            <button
+              id="btn-nova-empresa"
+              onClick={() => handleOpenCompanyModal()}
+              className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 sm:py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 active:bg-blue-700 transition cursor-pointer shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nova Empresa</span>
+            </button>
+          </div>
+
+          {/* Barra de Busca e Filtros de Status (Otimizada para Mobile e Desktop) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={companySearch}
+                onChange={(e) => setCompanySearch(e.target.value)}
+                placeholder="Buscar por nome, CNPJ, e-mail ou responsável..."
+                className="w-full pl-10 pr-9 py-2 rounded-lg border border-slate-700 bg-slate-900 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+              {companySearch && (
+                <button
+                  type="button"
+                  onClick={() => setCompanySearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filtros de Status em Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <button
+                type="button"
+                onClick={() => setCompanyStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  companyStatusFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'
+                }`}
+              >
+                Todas ({companies.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompanyStatusFilter('active')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  companyStatusFilter === 'active'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'
+                }`}
+              >
+                Ativas ({companies.filter((c) => c.status === 'active').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompanyStatusFilter('inactive')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  companyStatusFilter === 'inactive'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700'
+                }`}
+              >
+                Inativas ({companies.filter((c) => c.status !== 'active').length})
+              </button>
+            </div>
+          </div>
+
+          {/* VISÃO MOBILE: CARDS RESPONSIVOS COM BOTÕES DE TOQUE PROEMINENTES */}
+          <div className="block md:hidden space-y-3.5">
+            {filteredCompanies.length === 0 ? (
+              <div className="rounded-xl border border-slate-700 bg-slate-800 p-8 text-center text-slate-400">
+                Nenhuma empresa encontrada com os filtros atuais.
+              </div>
+            ) : (
+              filteredCompanies.map((c) => (
+                <div key={c.id} className="rounded-xl border border-slate-700 bg-slate-800 p-4 shadow-sm space-y-3.5">
+                  {/* Cabeçalho do Card */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-bold text-white text-base leading-snug break-words">{c.trade_name}</h4>
+                      <p className="text-xs text-slate-400 mt-0.5 break-words">{c.legal_name}</p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                        c.status === 'active'
+                          ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-700'
+                          : 'bg-rose-950/90 text-rose-300 border border-rose-700'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${c.status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      {c.status === 'active' ? 'Ativa' : 'Inativa'}
+                    </span>
+                  </div>
+
+                  {/* Badges de Plano e CNPJ */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="inline-block rounded-md px-2.5 py-1 bg-blue-900/40 text-blue-300 border border-blue-800 text-[11px] font-bold uppercase tracking-wider">
+                      {c.plan_name || 'Plano Padrão'}
+                    </span>
+                    <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-[11px]">
+                      {c.cnpj}
+                    </span>
+                  </div>
+
+                  {/* Detalhes de Quotas e Contato */}
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/70 p-3 rounded-lg border border-slate-700/60">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Telas / Players</span>
+                      <span className="text-white font-semibold">
+                        {c.player_count || 0} {c.max_players !== undefined ? `/ ${c.max_players}` : ''}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Operadores</span>
+                      {c.max_operators === 0 ? (
+                        <span className="text-amber-400 font-semibold text-[11px]">Sem operador (Show)</span>
+                      ) : (
+                        <span className="text-white font-semibold">
+                          {c.operator_count || 0} {c.max_operators !== undefined ? `/ ${c.max_operators}` : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="col-span-2 pt-2 border-t border-slate-800 text-slate-400 text-[11px] flex flex-wrap items-center justify-between gap-1">
+                      <span className="truncate">{c.email}</span>
+                      {c.due_date && <span className="shrink-0 font-mono text-slate-300">Vence: {c.due_date}</span>}
+                    </div>
+                  </div>
+
+                  {/* Botões de Ação para Celular (Área de toque otimizada >= 44px) */}
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCompanyModal(c)}
+                      className="w-full flex items-center justify-center gap-2 h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition cursor-pointer"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      <span>Editar Empresa</span>
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetCompanyId(c.id);
+                          setResetModalOpen(true);
+                        }}
+                        className="flex items-center justify-center gap-2 h-11 px-3 rounded-xl border border-amber-800/80 bg-amber-950/30 hover:bg-amber-900/40 active:bg-amber-900/60 text-amber-300 font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        <span>Resetar Senha</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCompany(c)}
+                        className={`flex items-center justify-center gap-2 h-11 px-3 rounded-xl border font-bold text-xs uppercase tracking-wider transition cursor-pointer ${
+                          c.status === 'active'
+                            ? 'border-rose-800/80 bg-rose-950/20 text-rose-300 hover:bg-rose-950/40 active:bg-rose-950/60'
+                            : 'border-emerald-800/80 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-950/40 active:bg-emerald-950/60'
+                        }`}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        <span>{c.status === 'active' ? 'Desativar' : 'Ativar'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* VISÃO DESKTOP: TABELA COM SUPORTE A OVERFLOW HORIZONTAL */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-700 bg-slate-800 shadow-sm">
+            <table className="w-full text-left text-xs text-slate-300 min-w-[700px]">
+              <thead className="border-b border-slate-700 bg-slate-800/80 uppercase font-semibold text-slate-400 text-[10px] tracking-wider">
+                <tr>
+                  <th className="px-5 py-3.5">Empresa</th>
+                  <th className="px-5 py-3.5">CNPJ / E-mail</th>
+                  <th className="px-5 py-3.5">Plano Contratado</th>
+                  <th className="px-5 py-3.5">Players / Operadores</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {filteredCompanies.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                      Nenhuma empresa encontrada com os filtros atuais.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCompanies.map((c) => (
+                    <tr key={c.id} className="hover:bg-slate-700/30 transition">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-white text-sm">{c.trade_name}</p>
+                        <p className="text-[11px] text-slate-400">{c.legal_name}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="font-mono text-slate-200">{c.cnpj}</p>
+                        <p className="text-[11px] text-slate-400">{c.email}</p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className="inline-block rounded px-2 py-0.5 bg-blue-900/40 text-blue-300 border border-blue-800 text-[10px] font-bold tracking-wider uppercase">
+                          {c.plan_name || 'Plano Padrão'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-slate-300 font-medium">
+                          {c.player_count || 0}{c.max_players !== undefined ? `/${c.max_players}` : ''} players |{' '}
+                          {c.max_operators === 0 ? (
+                            <span className="text-amber-400 font-semibold text-[11px]">Sem operador</span>
+                          ) : (
+                            `${c.operator_count || 0}${c.max_operators !== undefined ? `/${c.max_operators}` : ''} operadores`
+                          )}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                            c.status === 'active'
+                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                              : 'bg-rose-950/80 text-rose-300 border border-rose-800'
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              c.status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'
+                            }`}
+                          />
+                          {c.status === 'active' ? 'Ativa' : 'Inativa'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenCompanyModal(c)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700/60 text-slate-200 hover:text-white hover:bg-slate-700 border border-slate-600/50 transition cursor-pointer"
+                            title="Editar empresa"
+                          >
+                            <Edit2 className="h-3.5 w-3.5 text-blue-400" />
+                            <span className="text-[11px] font-semibold">Editar</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setResetCompanyId(c.id);
+                              setResetModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-amber-400 hover:bg-slate-700 border border-transparent hover:border-amber-700/50 transition cursor-pointer"
+                            title="Resetar senha"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleCompany(c)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                              c.status === 'active'
+                                ? 'border border-rose-800 text-rose-300 hover:bg-rose-950/40'
+                                : 'border border-emerald-800 text-emerald-300 hover:bg-emerald-950/40'
+                            }`}
+                          >
+                            {c.status === 'active' ? 'Desativar' : 'Ativar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: PLANOS */}
+      {activeTab === 'plans' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white">Planos Comerciais</h3>
+            <button
+              id="btn-novo-plano"
+              onClick={() => handleOpenPlanModal()}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Novo Plano</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {plans.map((p) => (
+              <div
+                key={p.id}
+                className={`rounded-xl border p-6 bg-slate-800 flex flex-col justify-between shadow-sm ${
+                  p.active ? 'border-slate-700' : 'border-slate-700/50 opacity-60'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-lg font-bold text-white tracking-tight">{p.name}</h4>
+                      {p.max_operators === 0 ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-800">
+                          Show (Sem Op)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800">
+                          Call (4:1)
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
+                        p.active
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                          : 'bg-slate-700 text-slate-400 border-slate-600'
+                      }`}
+                    >
+                      {p.active ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-5 min-h-[32px]">{p.description}</p>
+
+                  <div className="space-y-2.5 text-xs text-slate-300 border-t border-slate-700 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Players / Telas:</span>
+                      <strong className="text-white">{p.max_players} {p.max_players === 1 ? 'tela' : 'telas'}</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Operadores:</span>
+                      {p.max_operators === 0 ? (
+                        <span className="text-amber-400 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                          Sem Operador (Mídia/RSS)
+                        </span>
+                      ) : (
+                        <strong className="text-white">
+                          {p.max_operators} operadores {p.max_players > 0 && Math.round(p.max_operators / p.max_players) === 4 ? '(4 por tela)' : ''}
+                        </strong>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Armazenamento / Mídias:</span>
+                      <strong className="text-white">{p.max_storage} arquivos</strong>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-slate-700">
+                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Mensalidade:</span>
+                      <strong className="text-lg text-blue-400 font-bold">
+                        R$ {Number(p.monthly_price).toFixed(2)}<span className="text-xs text-slate-400 font-normal">/mês</span>
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-700 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => handleOpenPlanModal(p)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-600 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => handleTogglePlan(p)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                      p.active
+                        ? 'border border-rose-800 text-rose-300 hover:bg-rose-950/40'
+                        : 'border border-emerald-800 text-emerald-300 hover:bg-emerald-950/40'
+                    }`}
+                  >
+                    {p.active ? 'Desativar' : 'Ativar'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW: GOOGLE DRIVE & CENTRAL DE ARQUIVOS */}
+      {activeTab === 'drive' && (
+        <GoogleDriveFileManager
+          companies={companies}
+          isDevAdmin={true}
+          showToast={showToast}
+        />
+      )}
+
+      {/* MODAL EMPRESA - Otimizado para dispositivos móveis (Bottom-sheet) e desktop */}
+      {companyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs overflow-hidden">
+          <div className="w-full max-w-2xl h-[92dvh] sm:h-auto max-h-[92dvh] sm:max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-700 bg-slate-800 shadow-2xl text-slate-100 overflow-hidden">
+            {/* Barra de arraste visual para dispositivos móveis */}
+            <div className="w-12 h-1 bg-slate-600 rounded-full mx-auto mt-2.5 sm:hidden" />
+
+            {/* Cabeçalho Fixo do Modal */}
+            <div className="flex-shrink-0 px-4 sm:px-6 py-3.5 border-b border-slate-700 bg-slate-800/95 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                    {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
+                  </h3>
+                  {editingCompany && (
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60 truncate max-w-[150px] sm:max-w-none">
+                      {editingCompany.trade_name}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {editingCompany ? 'Atualize os dados cadastrais e limites do plano' : 'Preencha os dados cadastrais da nova empresa'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompanyModalOpen(false)}
+                className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Formulário com Corpo Rolável e Rodapé Fixo */}
+            <form onSubmit={handleSaveCompany} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 text-xs">
+                {/* SEÇÃO 1: Identificação Cadastral */}
+                <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                    1. Identificação da Empresa
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Nome Fantasia *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={companyForm.trade_name}
+                        onChange={(e) => setCompanyForm({ ...companyForm, trade_name: e.target.value })}
+                        placeholder="Ex: Drogaria Central"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Razão Social *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={companyForm.legal_name}
+                        onChange={(e) => setCompanyForm({ ...companyForm, legal_name: e.target.value })}
+                        placeholder="Ex: Drogaria Central Ltda"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      CNPJ *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={companyForm.cnpj}
+                      onChange={(e) => setCompanyForm({ ...companyForm, cnpj: e.target.value })}
+                      placeholder="00.000.000/0001-00"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* SEÇÃO 2: Contato e Gestão */}
+                <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                    2. Contato e Gestão
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        E-mail de Login *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={companyForm.email}
+                        onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })}
+                        placeholder="contato@empresa.com"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Telefone / WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={companyForm.phone}
+                        onChange={(e) => setCompanyForm({ ...companyForm, phone: e.target.value })}
+                        placeholder="(11) 99999-9999"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Responsável
+                      </label>
+                      <input
+                        type="text"
+                        value={companyForm.responsible}
+                        onChange={(e) => setCompanyForm({ ...companyForm, responsible: e.target.value })}
+                        placeholder="Nome do gestor"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEÇÃO 3: Endereço */}
+                <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                    3. Endereço e Localização
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div className="sm:col-span-3">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Endereço Completo
+                      </label>
+                      <input
+                        type="text"
+                        value={companyForm.address}
+                        onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
+                        placeholder="Rua, Número, Bairro, Complemento"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Cidade
+                      </label>
+                      <input
+                        type="text"
+                        value={companyForm.city}
+                        onChange={(e) => setCompanyForm({ ...companyForm, city: e.target.value })}
+                        placeholder="Ex: São Paulo"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Estado (UF)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={companyForm.state}
+                        onChange={(e) => setCompanyForm({ ...companyForm, state: e.target.value.toUpperCase() })}
+                        placeholder="SP"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 uppercase font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEÇÃO 4: Plano Contratado e Vigência */}
+                <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                    4. Plano e Vigência
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Plano Contratado *
+                      </label>
+                      <select
+                        required
+                        value={companyForm.plan_id}
+                        onChange={(e) => setCompanyForm({ ...companyForm, plan_id: e.target.value })}
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="">Selecione um plano...</option>
+                        {plans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.max_players} {p.max_players === 1 ? 'tela' : 'telas'} | {p.max_operators === 0 ? 'Sem operador' : `${p.max_operators} operadores`})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Data de Início
+                      </label>
+                      <input
+                        type="date"
+                        value={companyForm.start_date}
+                        onChange={(e) => setCompanyForm({ ...companyForm, start_date: e.target.value })}
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Data de Vencimento
+                      </label>
+                      <input
+                        type="date"
+                        value={companyForm.due_date}
+                        onChange={(e) => setCompanyForm({ ...companyForm, due_date: e.target.value })}
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SEÇÃO 5: Senha Inicial (apenas para cadastro novo) */}
+                {!editingCompany && (
+                  <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                      5. Acesso Inicial
+                    </span>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                        Senha Inicial de Acesso
+                      </label>
+                      <input
+                        type="password"
+                        value={companyForm.password}
+                        onChange={(e) => setCompanyForm({ ...companyForm, password: e.target.value })}
+                        placeholder="Padrão: 123456 (troca obrigatória no primeiro acesso)"
+                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rodapé Fixo com Botões Visíveis em Qualquer Dispositivo */}
+              <div className="flex-shrink-0 px-4 sm:px-6 py-3.5 border-t border-slate-700 bg-slate-800/95 backdrop-blur-md flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCompanyModalOpen(false)}
+                  className="h-11 px-5 rounded-xl border border-slate-600 bg-slate-700 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-slate-600 active:bg-slate-800 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>{editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PLANO - Otimizado para Mobile e Desktop */}
+      {planModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs overflow-hidden">
+          <div className="w-full max-w-md h-[90dvh] sm:h-auto max-h-[90dvh] sm:max-h-[85vh] flex flex-col rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-700 bg-slate-800 shadow-2xl text-slate-100 overflow-hidden">
+            <div className="w-12 h-1 bg-slate-600 rounded-full mx-auto mt-2.5 sm:hidden" />
+
+            {/* Cabeçalho Fixo */}
+            <div className="flex-shrink-0 px-4 sm:px-6 py-3.5 border-b border-slate-700 bg-slate-800/95 flex items-center justify-between">
+              <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
+                {editingPlan ? 'Editar Plano' : 'Novo Plano'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setPlanModalOpen(false)}
+                className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                title="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePlan} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 text-xs">
+                {/* Seletor de Modelos Predefinidos */}
+                <div className="rounded-xl border border-slate-700 bg-slate-900/90 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
+                      Modelos Rápidos (Clique para preencher)
+                    </span>
+                    <span className="text-[9px] text-slate-500 font-mono">Call (4:1) | Show (Sem Op)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {PLAN_TEMPLATES.map((tpl) => {
+                      const isSelected = planForm.name.toLowerCase() === tpl.name.toLowerCase();
+                      return (
+                        <button
+                          key={tpl.name}
+                          type="button"
+                          onClick={() => handleApplyPlanTemplate(tpl)}
+                          className={`px-2.5 py-1.5 rounded-lg text-left border transition text-[11px] cursor-pointer flex flex-col ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-950/60 text-white shadow-sm'
+                              : 'border-slate-700/80 bg-slate-800 hover:bg-slate-700/80 text-slate-300'
+                          }`}
+                        >
+                          <span className="font-bold">{tpl.name}</span>
+                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">{tpl.tag}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nome do Plano *</label>
+                  <input
+                    type="text"
+                    required
+                    value={planForm.name}
+                    onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                    placeholder="Ex: Call Básico ou Show Intermediário"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Descrição</label>
+                  <textarea
+                    rows={2}
+                    value={planForm.description}
+                    onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
+                    placeholder="Detalhes sobre a capacidade deste plano"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Controles de Linha Show (Sem Operador) e Proporção 4:1 (Linha Call) */}
+                <div className="rounded-xl border border-slate-700/80 bg-slate-900/60 p-3 space-y-2.5">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={planWithoutOperator}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setPlanWithoutOperator(checked);
+                        if (checked) {
+                          setPlanForm({ ...planForm, max_operators: 0 });
+                        } else {
+                          const screens = Number(planForm.max_players) || 1;
+                          const calculated = autoCalcRatio ? screens * 4 : 4;
+                          setPlanForm({ ...planForm, max_operators: calculated });
+                        }
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-0 focus:ring-offset-0"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase tracking-wide">
+                        Plano sem operador (Linha Show - Exibição de Telas/Mídia)
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Para clientes que não vão usar chamadas na tela (pontos exclusivos de mídia indoor, notícias RSS e publicidade).
+                      </p>
+                    </div>
+                  </label>
+
+                  {!planWithoutOperator && (
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none pt-2 border-t border-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={autoCalcRatio}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAutoCalcRatio(checked);
+                          if (checked) {
+                            const screens = Number(planForm.max_players) || 1;
+                            setPlanForm({ ...planForm, max_operators: screens * 4 });
+                          }
+                        }}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-0 focus:ring-offset-0"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wide">
+                          Proporção de 4 operadores para cada tela (Padrão Linha Call)
+                        </span>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Calcula automaticamente 4 operadores por tela cadastrada (ex: 1 tela = 4 op, 3 telas = 12 op).
+                        </p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Número de Telas / Players *
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={planForm.max_players}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const screens = v === '' ? '' : Math.max(1, Number(v));
+                        if (!planWithoutOperator && autoCalcRatio && typeof screens === 'number') {
+                          setPlanForm({
+                            ...planForm,
+                            max_players: screens,
+                            max_operators: screens * 4,
+                          });
+                        } else {
+                          setPlanForm({ ...planForm, max_players: screens });
+                        }
+                      }}
+                      placeholder="Ex: 2"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Limite de Operadores *
+                    </label>
+                    {planWithoutOperator ? (
+                      <div className="w-full rounded-xl border border-amber-800/80 bg-amber-950/40 px-3.5 py-2 text-amber-300 font-semibold text-xs flex items-center justify-between min-h-[44px]">
+                        <span>0 operadores</span>
+                        <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-900/80 px-1.5 py-0.5 rounded">Sem Chamada</span>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          disabled={autoCalcRatio}
+                          value={planForm.max_operators}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPlanForm({ ...planForm, max_operators: v === '' ? '' : Math.max(0, Number(v)) });
+                          }}
+                          placeholder="Ex: 4"
+                          className={`w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 ${
+                            autoCalcRatio ? 'opacity-90 bg-slate-900/80 cursor-not-allowed text-blue-300 pr-20' : ''
+                          }`}
+                        />
+                        {autoCalcRatio && (
+                          <span className="absolute right-2.5 top-2.5 text-[10px] font-mono text-blue-400 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-800">
+                            {Number(planForm.max_players) || 1} x 4 = {planForm.max_operators}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Limite de Mídias *</label>
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={planForm.max_storage}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPlanForm({ ...planForm, max_storage: v === '' ? '' : Number(v) });
+                      }}
+                      placeholder="Ex: 100"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Valor Mensal (R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      required
+                      value={planForm.monthly_price}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPlanForm({ ...planForm, monthly_price: v === '' ? '' : Number(v) });
+                      }}
+                      placeholder="Ex: 49.00"
+                      className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rodapé Fixo */}
+              <div className="flex-shrink-0 px-4 sm:px-6 py-3.5 border-t border-slate-700 bg-slate-800/95 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPlanModalOpen(false)}
+                  className="h-11 px-5 rounded-xl border border-slate-600 bg-slate-700 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-slate-600 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs font-bold uppercase tracking-wider text-white shadow-md transition cursor-pointer"
+                >
+                  Salvar Plano
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESET SENHA - Otimizado para Mobile e Desktop */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs overflow-hidden">
+          <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-700 bg-slate-800 p-5 sm:p-6 shadow-2xl text-slate-100">
+            <div className="w-12 h-1 bg-slate-600 rounded-full mx-auto mb-3 sm:hidden" />
+            <div className="flex items-center justify-between border-b border-slate-700 pb-3 mb-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Resetar Senha da Empresa</h3>
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              Defina a nova senha temporária para o usuário administrador da empresa.
+            </p>
+            <form onSubmit={handleResetPassword} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nova Senha Provisória</label>
+                <input
+                  type="password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Deixe em branco para o padrão: 123456"
+                  className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setResetModalOpen(false)}
+                  className="h-11 px-4 rounded-xl border border-slate-600 bg-slate-700 text-xs font-bold uppercase tracking-wider text-slate-300 hover:text-white hover:bg-slate-600 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold uppercase tracking-wider text-white shadow-md transition cursor-pointer"
+                >
+                  Confirmar Reset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAÇÃO DE AÇÃO */}
+      <ConfirmModal
+        isOpen={confirmData.isOpen}
+        title={confirmData.title}
+        message={confirmData.message}
+        onConfirm={confirmData.action}
+        onCancel={() => setConfirmData((prev) => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  );
+};
