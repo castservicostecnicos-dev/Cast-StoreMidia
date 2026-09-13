@@ -1,89 +1,65 @@
 # 🚀 Guia de Publicação no Cloudflare (Pages & Workers) com GitHub
 
-Este projeto já está **100% preparado e configurado** para sincronização com o **GitHub** e publicação instantânea no **Cloudflare**.
+Este projeto está **100% preparado e configurado** para publicação no **Cloudflare Pages** ou **Cloudflare Workers**, operando em **Modo Autônomo Edge** (sem necessidade obrigatória de servidor externo) ou em **Modo Integrado** (com servidor Node.js dedicado).
 
 ---
 
-## 🏆 Qual escolher: Cloudflare Pages ou Cloudflare Workers?
+## 💡 Entendendo o funcionamento após a publicação
 
-| Recurso | **Cloudflare Pages** (⭐ Recomendado) | **Cloudflare Workers** |
-| :--- | :--- | :--- |
-| **Integração com GitHub** | **Nativa com 1 clique** (deploys automáticos a cada `git push`) | Requer GitHub Actions ou CLI |
-| **Arquitetura** | Frontend SPA (Vite + React) com CDN global e Edge Functions | Workers Serverless com assets estáticos |
-| **Roteamento SPA** | Automático via `_redirects` (`/* /index.html 200`) | Configurado via `wrangler.jsonc` |
-| **Deploy sem terminal** | Sim, direto pelo painel do Cloudflare | Não (requer Wrangler CLI ou Actions) |
-| **Facilidade de Uso** | **Extremamente simples** | Nível intermediário |
+O CAST StoreMidia possui **dois modos de operação**:
 
-> **Importante: Você NÃO precisa de Secrets ou Tokens!**
-> Com o **Cloudflare Pages conectado ao GitHub**, a Cloudflare faz a sincronização e os deploys de forma nativa e automática. Você não precisa configurar nenhum token, secret ou chave no GitHub.
+### 1. 🌟 Modo Autônomo Edge (Recomendado - Zero Custos e Zero Configuração)
+- O aplicativo roda **100% no Cloudflare Pages** utilizando **Cloudflare Pages Functions** na borda (Edge).
+- **Não requer servidor backend externo** (Render, VPS ou Docker).
+- Autenticação, controle de players (horizontal e vertical), playlists com mídias, previsão do tempo ao vivo (Open-Meteo), RSS e chamadas de senha de guichê funcionam instantaneamente.
+- Em caso de hospedagem estática pura (como GitHub Pages) ou perda momentânea de conexão, o sistema ativa automaticamente o **Mecanismo LocalStore PWA**, persistindo dados no navegador e sincronizando abas em tempo real via `BroadcastChannel`.
 
----
-
-## 📦 Passo 1: Sincronizar o projeto com o GitHub
-
-### Se estiver usando o Google AI Studio:
-1. No menu superior ou de configurações do AI Studio, clique em **Export** (ou **Share** / **Settings**).
-2. Escolha **Export to GitHub** (ou baixe o arquivo ZIP).
-3. Se baixou o ZIP, descompacte e envie para o seu GitHub:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: projeto midia indoor preparado para cloudflare"
-   git branch -M main
-   git remote add origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-   git push -u origin main
-   ```
+### 2. 🏢 Modo com Servidor Backend Dedicado (Opcional - Multilojas em Redes Distintas)
+- Se você quiser um servidor centralizado Node.js/Express (com banco de dados único gravado em disco) para gerenciar centenas de telas em diferentes cidades:
+  1. Suba o projeto no [Render.com](https://render.com) ou [Railway.app](https://railway.app) como *Web Service* (comando de build: `npm run build`, comando de start: `npm start`).
+  2. No painel do **Cloudflare Pages**, acesse: **Settings** > **Environment variables** e adicione a variável:
+     - `BACKEND_URL` = `https://seu-servidor-backend.onrender.com`
+  3. O Cloudflare Pages atuará como proxy reverso de alto desempenho para o seu servidor.
 
 ---
 
-## 🌐 Passo 2: Publicar no Cloudflare Pages (Método Recomendado)
+## 🌐 Passo a Passo: Publicação no Cloudflare Pages
 
 1. Acesse o [Painel da Cloudflare (dash.cloudflare.com)](https://dash.cloudflare.com).
-2. No menu lateral esquerdo, clique em **Compute (Workers & Pages)** > **Create application**.
-3. Selecione a aba **Pages** e clique em **Connect to Git** (Conectar ao Git).
-4. Conecte sua conta do GitHub e selecione o repositório do app.
-5. Na tela de configuração de build, preencha:
-   - **Project name**: `cast-storemidia` (ou o nome que preferir)
-   - **Production branch**: `main` (ou `master`)
-   - **Framework preset**: Selecione `Vite` (ou `None`)
+2. No menu lateral, clique em **Compute (Workers & Pages)** > **Create application** > aba **Pages**.
+3. Clique em **Connect to Git** e selecione o repositório do seu GitHub.
+4. Preencha os campos de configuração da build:
+   - **Framework preset**: `Vite` (ou `None`)
    - **Build command**: `npm run build:pages` *(ou `npm run build`)*
    - **Build output directory**: `dist`
-   - **Root directory**: Deixe em branco (raiz)
-6. Em **Environment variables (advanced)**, adicione:
+   - **Root directory**: Deixe em branco
+5. Em **Environment variables (advanced)**, adicione:
    - `NODE_VERSION` = `20`
-   - *(Opcional)* `VITE_API_URL` = URL do seu servidor backend (se estiver em outro serviço, ex: `https://meu-backend.onrender.com` ou Cloud Run)
-   - *(Opcional)* `BACKEND_URL` = URL do backend para o proxy transparente do Cloudflare Functions (`functions/api/[[route]].ts`)
-7. Clique em **Save and Deploy**.
-8. Pronto! Em cerca de 1 minuto seu aplicativo estará publicado e acessível no endereço gratuito `https://cast-storemidia.pages.dev`.
+   - *(Opcional)* `BACKEND_URL` = URL do seu servidor backend se optar pelo Modo 2. Se deixar sem, funcionará automaticamente no **Modo Autônomo Edge**.
+6. Clique em **Save and Deploy**.
+7. Pronto! O aplicativo será gerado e estará no ar com HTTPS gratuito em `https://seu-app.pages.dev`.
 
 ---
 
-## ⚡ Passo 3: Opção Alternativa - Deploy via Cloudflare Workers (Wrangler CLI)
+## 🔑 Contas de Acesso Pré-Configuradas
 
-Se você preferir publicar via linha de comando no Cloudflare Workers:
+Ao abrir o app publicado, você pode entrar imediatamente com:
 
-1. Faça o build dos arquivos estáticos:
-   ```bash
-   npm run build:pages
-   ```
-2. Faça o login na Cloudflare:
-   ```bash
-   npx wrangler login
-   ```
-3. Publique o Worker:
-   ```bash
-   npm run deploy:worker
-   # ou: npx wrangler deploy
-   ```
-O projeto já conta com o arquivo `wrangler.jsonc` e `wrangler.toml` configurados com `not_found_handling: "single-page-application"`.
+| Perfil | E-mail / Código | Senha |
+| :--- | :--- | :--- |
+| **Administrador** | `admin@cast.com` ou `ale11062@gmail.com` | `123456` ou `Admin@123456` |
+| **Empresa (Gestor)** | `empresa@cast.com` | `123456` |
+| **Operador (Chamador de Senha)** | `operador@cast.com` | `123456` |
+| **Player TV (Horizontal)** | Aba *Código do Player*: `TV-1001` | Sem senha necessária |
+| **Totem Vertical (9:16)** | Aba *Código do Player*: `TV-1002` | Sem senha necessária |
 
 ---
 
-## 🛠️ Arquivos já preparados no projeto:
+## 🛠️ Arquivos de Infraestrutura Prontos:
 
-- `public/_redirects`: Garante que URLs diretas como `/?player=CODE&token=TOKEN` ou qualquer outra rota funcionem sem erro 404 (SPA fallback).
-- `public/_headers`: Configura políticas de cache para mídias, cabeçalhos de segurança e service workers (PWA).
-- `public/_routes.json`: Otimiza a CDN do Cloudflare para servir arquivos estáticos direto da borda.
-- `functions/api/[[route]].ts`: Edge Function do Cloudflare Pages que realiza proxy reverso inteligente para chamadas de API caso configurado `BACKEND_URL`.
-- `wrangler.jsonc` e `wrangler.toml`: Configuração para deploys com Cloudflare Workers.
-- `src/lib/api.ts`: Suporta a variável de ambiente `VITE_API_URL` para comunicação flexível com o backend.
+- `functions/api/[[route]].ts`: Roteador Edge do Cloudflare Pages com modo autônomo e proxy reverso inteligente.
+- `public/_redirects`: Regra de fallback SPA para navegação direta e parâmetros de URL (`/?player=CODE&token=TOKEN`).
+- `public/_headers`: Políticas de cache para mídias, cabeçalhos de segurança e service workers PWA.
+- `public/_routes.json`: Roteamento CDN otimizado na borda.
+- `src/lib/api.ts`: Cliente de API resiliente com fallback local transparente.
+- `src/lib/localStore.ts` & `src/lib/localApiFallback.ts`: Mecanismo autônomo offline-first com sincronização multi-abas em tempo real.

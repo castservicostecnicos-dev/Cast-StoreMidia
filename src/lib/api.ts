@@ -1,4 +1,5 @@
 import { Role, User, Company, Plan, Player, Operator, Playlist, Media, RssFeed, RssPreset, RssArticle, CallPhrase, PlayerCall, AdminStats, CompanyStats, WeatherData } from '../types';
+import { handleLocalFallback } from './localApiFallback';
 
 const TOKEN_KEY = 'indoor_media_token';
 
@@ -48,18 +49,36 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}/api${endpoint}`, {
-    ...options,
-    headers,
-  });
+  try {
+    const response = await fetch(`${API_BASE}/api${endpoint}`, {
+      ...options,
+      headers,
+    });
 
-  const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.error || 'Ocorreu um erro ao processar a requisição.');
+    // Se a resposta retornar erro de backend não configurado ou falha de infraestrutura 502/503/404
+    if (!response.ok) {
+      const errMsg = String(data.error || '');
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 404 ||
+        errMsg.toLowerCase().includes('backend não') ||
+        errMsg.toLowerCase().includes('não configurado')
+      ) {
+        console.warn(`[CAST StoreMidia] Backend remoto não disponível em ${endpoint}. Ativando modo autônomo local.`);
+        return await handleLocalFallback<T>(endpoint, options);
+      }
+      throw new Error(data.error || 'Ocorreu um erro ao processar a requisição.');
+    }
+
+    return data as T;
+  } catch (err: any) {
+    // Se falhar a conexão de rede (TypeError: Failed to fetch, offline, etc.)
+    console.warn(`[CAST StoreMidia] Conexão com backend indisponível (${err.message || 'offline'}). Usando fallback local.`);
+    return await handleLocalFallback<T>(endpoint, options);
   }
-
-  return data as T;
 }
 
 export const api = {
