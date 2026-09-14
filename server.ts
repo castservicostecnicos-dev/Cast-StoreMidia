@@ -21,7 +21,7 @@ async function startServer() {
 
   // API health check
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'CAST StoreMidia Server', timestamp: Date.now() });
+    res.json({ status: 'ok', service: 'Indoor Media Server', timestamp: Date.now() });
   });
 
   // Mount API router
@@ -43,7 +43,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CAST StoreMidia Server running on port ${PORT}`);
+    console.log(`Indoor Media Server running on port ${PORT}`);
   });
 }
 

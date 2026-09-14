@@ -23,13 +23,12 @@ import {
   Star,
   Thermometer,
 } from 'lucide-react';
-import { api, getStoredToken, API_BASE, formatMediaUrl } from '../lib/api';
+import { api, getStoredToken } from '../lib/api';
 import { playCallChime } from '../lib/audio';
 import { PlayerOrientation, WeatherData } from '../types';
 import { WeatherClockMedia } from '../components/WeatherClockMedia';
 import { RssNewsMedia } from '../components/RssNewsMedia';
 import { cleanRssText } from '../lib/rssCleaner';
-import { AndroidBoxSetupModal } from '../components/AndroidBoxSetupModal';
 
 interface PlayerViewProps {
   onExit?: () => void;
@@ -88,7 +87,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
   const [callRemaining, setCallRemaining] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [tvBoxModalOpen, setTvBoxModalOpen] = useState(false);
 
   // RSS headlines with instantaneous initial display and offline local cache
   const DEFAULT_HEADLINES = [
@@ -97,7 +95,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
     'Atendimento Humanizado: Nossos consultores e farmacêuticos estão à disposição para orientações.',
     'Dica do Especialista: Pratique 20 a 30 minutos de caminhada diária para fortalecer o coração.',
     'Prevenção: Meça sua pressão arterial e glicemia regularmente em nossa sala de atendimento.',
-    'CAST StoreMidia: Programação digital de alta definição e chamadas de atendimento em tempo real.',
+    'Mídia Indoor Conectada: Programação digital e chamadas de atendimento em tempo real.',
   ];
 
   const [rssHeadlines, setRssHeadlines] = useState<string[]>(() => {
@@ -179,47 +177,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
   const controlsTimeoutRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Screen Wake Lock API para TV Box / Android não apagar ou suspender a tela
-  useEffect(() => {
-    let wakeLockSentinel: any = null;
-    const requestWakeLock = async () => {
-      try {
-        if ('wakeLock' in navigator) {
-          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
-        }
-      } catch {
-        // Wake lock não suportado ou negado
-      }
-    };
-    requestWakeLock();
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        requestWakeLock();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      if (wakeLockSentinel) {
-        wakeLockSentinel.release().catch(() => {});
-      }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  // Atalhos de teclado para Controle Remoto de TV Box (OK / Enter / Espaço / F para Tela Cheia)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'f' || e.key === 'F' || e.key === 'F11') {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
   // Monitor network connectivity changes
   useEffect(() => {
     const handleOnline = () => {
@@ -265,13 +222,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           if (hasCaches) {
             const targetCache = item.type === 'video' ? videoCache : imageCache;
             if (targetCache) {
-              const formattedUrl = formatMediaUrl(item.file_url);
-              const matched = await targetCache.match(formattedUrl);
+              const matched = await targetCache.match(item.file_url);
               if (!matched) {
                 // Fetch through browser/service worker to warm the CacheFirst route
-                const response = await fetch(formattedUrl, { mode: 'no-cors' });
+                const response = await fetch(item.file_url, { mode: 'no-cors' });
                 if (response && response.type !== 'error') {
-                  await targetCache.put(formattedUrl, response.clone());
+                  await targetCache.put(item.file_url, response.clone());
                 }
               }
             }
@@ -455,7 +411,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
     if (playerCode) params.append('code', playerCode);
     if (companyId) params.append('companyId', companyId);
 
-    const sseUrl = `${API_BASE}/api/realtime/stream?${params.toString()}`;
+    const sseUrl = `/api/realtime/stream?${params.toString()}`;
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = (event) => {
@@ -620,7 +576,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
         <div className="flex flex-col items-center gap-3">
           <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
           <p className="text-sm font-semibold tracking-wider uppercase text-slate-300">
-            Iniciando Reprodutor CAST StoreMidia...
+            Iniciando Reprodutor de Mídia Indoor...
           </p>
         </div>
       </div>
@@ -663,7 +619,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      onDoubleClick={toggleFullscreen}
       className="relative flex h-screen w-screen items-center justify-center bg-black overflow-hidden select-none"
     >
       {/* 
@@ -720,7 +675,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
             <video
               ref={videoRef}
               key={currentMedia.id + currentIndex}
-              src={formatMediaUrl(currentMedia.file_url)}
+              src={currentMedia.file_url}
               autoPlay
               muted
               playsInline
@@ -738,7 +693,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           ) : (
             <img
               key={currentMedia?.id + currentIndex}
-              src={formatMediaUrl(currentMedia?.file_url)}
+              src={currentMedia?.file_url}
               alt={currentMedia?.name}
               referrerPolicy="no-referrer"
               onError={(e) => {
@@ -909,17 +864,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           <span>{fitMode === 'contain' ? 'Proporção 16:9/9:16' : 'Preencher'}</span>
         </button>
 
-        {/* Guia TV Box Android & Auto-Start */}
-        <button
-          type="button"
-          onClick={() => setTvBoxModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600/90 hover:bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white border border-blue-400/40 shadow-xl cursor-pointer backdrop-blur-sm transition"
-          title="Configurar TV Box Android & Auto-Start"
-        >
-          <Tv className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Configurar TV Box</span>
-        </button>
-
         {/* Teste de áudio */}
         <button
           type="button"
@@ -988,15 +932,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           </span>
         </div>
       </div>
-
-      {/* Modal de Configuração para TV Box Android (Tela Cheia + Auto-Start) */}
-      <AndroidBoxSetupModal
-        isOpen={tvBoxModalOpen}
-        onClose={() => setTvBoxModalOpen(false)}
-        playerCode={data.player.code}
-        playerToken={data.player.access_token}
-        playerName={data.player.name}
-      />
     </div>
   );
 };

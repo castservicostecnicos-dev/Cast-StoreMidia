@@ -62,12 +62,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Brand */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm shrink-0">
-            C
+            M
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="text-base sm:text-xl font-bold tracking-tight text-white">
-                CAST <span className="text-blue-400">StoreMidia</span>
+              <span className="text-base sm:text-xl font-semibold tracking-tight uppercase text-white">
+                MÍDIA<span className="text-blue-400">INDOOR</span>
               </span>
               <span className={`hidden xs:inline text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${roleColors[user.role]}`}>
                 {getRoleLabel(user.role)}

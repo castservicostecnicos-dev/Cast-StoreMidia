@@ -144,7 +144,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
 
       // Title
       doc.setFontSize(26);
-      doc.text('CAST StoreMidia', 35, 66);
+      doc.text('Mídia Indoor Inteligente', 35, 66);
       doc.setFontSize(20);
       doc.setTextColor(59, 130, 246); // light blue
       doc.text('& Painel de Chamada de Senhas com Voz', 35, 76);
@@ -681,8 +681,8 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
 
       // Save PDF file to user device
       const fileName = clientName
-        ? `Apresentacao_CAST_StoreMidia_${clientName.replace(/\s+/g, '_')}.pdf`
-        : 'Apresentacao_CAST_StoreMidia.pdf';
+        ? `Apresentacao_Midia_Indoor_${clientName.replace(/\s+/g, '_')}.pdf`
+        : 'Apresentacao_Midia_Indoor_e_Chamadas.pdf';
 
       doc.save(fileName);
       setDownloadSuccess(true);
@@ -814,7 +814,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
                   </div>
 
                   <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-                    CAST StoreMidia <br />
+                    Mídia Indoor Inteligente <br />
                     <span className="text-blue-500">& Painel de Chamada de Senhas com Voz</span>
                   </h1>
 
@@ -921,7 +921,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
 
                 <div className="border-t border-slate-800 pt-2 text-xs text-slate-400 flex justify-between">
                   <span>Valorização imediata da imagem corporativa do seu espaço</span>
-                  <span>CAST StoreMidia</span>
+                  <span>Mídia Indoor & Call</span>
                 </div>
               </div>
             )}
@@ -1261,7 +1261,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
                 </div>
 
                 <div className="border-t border-slate-800 pt-2 text-xs text-slate-400 flex justify-between">
-                  <span>CAST StoreMidia & Painel de Chamadas</span>
+                  <span>Mídia Indoor Inteligente & Painel de Chamadas</span>
                   <span>Slide 7 de 7</span>
                 </div>
               </div>

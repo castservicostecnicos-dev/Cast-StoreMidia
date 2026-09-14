@@ -9,7 +9,7 @@ if ('serviceWorker' in navigator) {
   registerSW({
     immediate: true,
     onRegistered(registration) {
-      console.log('Service Worker do CAST StoreMidia registrado com sucesso para reprodução offline.');
+      console.log('Service Worker do Mídia Indoor registrado com sucesso para reprodução offline.');
       if (registration) {
         // Periodic check for cache updates every hour
         setInterval(() => {

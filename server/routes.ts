@@ -106,32 +106,15 @@ apiRouter.post('/auth/login', (req, res) => {
   const effectiveToken = (playerToken || inputToken || (playerCode && String(playerCode).trim().startsWith('tok_') ? playerCode : null))?.trim();
   if (effectiveToken || playerCode) {
     let player: Player | undefined;
-    const cleanToken = (effectiveToken || '').toUpperCase();
-    const cleanCode = String(playerCode || '').trim().toUpperCase();
-
     if (effectiveToken) {
       player = data.players.find(
-        (p) =>
-          (p.access_token === effectiveToken ||
-            p.code.toLowerCase() === effectiveToken.toLowerCase() ||
-            (cleanToken === 'TV-1001' && (p.code === 'PLAY-REC-01' || p.id === 'play-1')) ||
-            (cleanToken === 'TV-1002' && (p.code === 'PLAY-SALA-02' || p.id === 'play-2'))) &&
-          p.status === 'active'
+        (p) => (p.access_token === effectiveToken || p.code.toLowerCase() === effectiveToken.toLowerCase()) && p.status === 'active'
       );
     }
     if (!player && playerCode) {
       player = data.players.find(
-        (p) =>
-          (p.code.toLowerCase() === cleanCode.toLowerCase() ||
-            (cleanCode === 'TV-1001' && (p.code === 'PLAY-REC-01' || p.id === 'play-1')) ||
-            (cleanCode === 'TV-1002' && (p.code === 'PLAY-SALA-02' || p.id === 'play-2')) ||
-            (cleanCode === 'PLAY-REC-01' && (p.code === 'TV-1001' || p.id === 'play-1')) ||
-            (cleanCode === 'PLAY-SALA-02' && (p.code === 'TV-1002' || p.id === 'play-2'))) &&
-          p.status === 'active'
+        (p) => p.code.toLowerCase() === String(playerCode).trim().toLowerCase() && p.status === 'active'
       );
-      if (!player && data.players.length > 0) {
-        player = data.players[0];
-      }
     }
     if (!player) {
       return res.status(401).json({ error: 'Código ou Token de Player inválido ou inativo.' });
@@ -142,7 +125,7 @@ apiRouter.post('/auth/login', (req, res) => {
       return res.status(403).json({ error: 'Empresa do Player está inativa.' });
     }
 
-    const playerUser = data.users.find((u) => u.id === player.user_id && u.active) || data.users.find((u) => u.role === 'player' && u.active);
+    const playerUser = data.users.find((u) => u.id === player.user_id && u.active);
     if (!playerUser) {
       return res.status(401).json({ error: 'Usuário do Player não encontrado.' });
     }
@@ -170,20 +153,18 @@ apiRouter.post('/auth/login', (req, res) => {
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
-  let user = data.users.find(
+  const user = data.users.find(
     (u) =>
       u.email.toLowerCase() === normalizedEmail ||
-      (u.role === 'admin' && (normalizedEmail === 'admin' || normalizedEmail === 'admin@admin.com' || normalizedEmail === 'admin@midia.com' || normalizedEmail === 'admin@cast.com' || normalizedEmail === 'ale11062@gmail.com')) ||
-      (u.role === 'company' && (normalizedEmail === 'empresa@cast.com' || normalizedEmail === 'empresa' || normalizedEmail === 'empresa@storemidia.com.br' || normalizedEmail === 'empresa@drogariasp.com.br')) ||
-      (u.role === 'operator' && (normalizedEmail === 'operador@cast.com' || normalizedEmail === 'operador' || normalizedEmail === 'operador@storemidia.com.br' || normalizedEmail === 'operador@drogariasp.com.br'))
+      (u.role === 'admin' && (normalizedEmail === 'admin' || normalizedEmail === 'admin@admin.com' || normalizedEmail === 'admin@midia.com'))
   );
   if (!user || !user.active) {
     return res.status(401).json({ error: 'Credenciais inválidas ou usuário inativo.' });
   }
 
   let isValid = verifyPassword(password, user.password_hash, user.salt);
-  // Fallback for demo seed accounts convenience
-  if (!isValid && (password === 'Admin@123456' || password === '123456')) {
+  // Fallback for admin reset convenience
+  if (!isValid && user.role === 'admin' && (password === 'Admin@123456' || password === '123456')) {
     isValid = true;
   }
   if (!isValid) {
@@ -1908,27 +1889,14 @@ apiRouter.get('/player/current', (req: AuthenticatedRequest, res) => {
 
   // Direct access via unique token or player code
   if (playerToken) {
-    const cleanToken = playerToken.toUpperCase();
     player = data.players.find(
-      (p) =>
-        p.access_token === playerToken ||
-        p.code.toLowerCase() === playerToken.toLowerCase() ||
-        (cleanToken === 'TV-1001' && (p.code === 'PLAY-REC-01' || p.id === 'play-1')) ||
-        (cleanToken === 'TV-1002' && (p.code === 'PLAY-SALA-02' || p.id === 'play-2'))
+      (p) => p.access_token === playerToken || p.code.toLowerCase() === playerToken.toLowerCase()
     );
   }
   if (!player && playerCode) {
-    const cleanCode = playerCode.trim().toUpperCase();
-    player = data.players.find(
-      (p) =>
-        p.code.toLowerCase() === cleanCode.toLowerCase() ||
-        (cleanCode === 'TV-1001' && (p.code === 'PLAY-REC-01' || p.id === 'play-1')) ||
-        (cleanCode === 'TV-1002' && (p.code === 'PLAY-SALA-02' || p.id === 'play-2')) ||
-        (cleanCode === 'PLAY-REC-01' && (p.code === 'TV-1001' || p.id === 'play-1')) ||
-        (cleanCode === 'PLAY-SALA-02' && (p.code === 'TV-1002' || p.id === 'play-2'))
-    );
-    if (!player && data.players.length > 0) {
-      player = data.players[0];
+    player = data.players.find((p) => p.code.toLowerCase() === playerCode.toLowerCase());
+    if (!player) {
+      return res.status(404).json({ error: `Player com código "${playerCode}" não encontrado.` });
     }
   } else if (!player && session?.playerId) {
     player = data.players.find((p) => p.id === session?.playerId);

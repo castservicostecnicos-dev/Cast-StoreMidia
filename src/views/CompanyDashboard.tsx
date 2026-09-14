@@ -38,11 +38,10 @@ import {
   Copy,
   QrCode,
 } from 'lucide-react';
-import { api, formatMediaUrl } from '../lib/api';
+import { api } from '../lib/api';
 import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
-import { AndroidBoxSetupModal } from '../components/AndroidBoxSetupModal';
 import {
   ensureClientFolders,
   uploadFileToDrive,
@@ -69,31 +68,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [rssList, setRssList] = useState<RssFeed[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Safe stats object with robust fallbacks to prevent runtime crashes if backend returns partial data
-  const safeStats: CompanyStats = {
-    playersCount: stats?.playersCount ?? players.length,
-    activePlayersCount: stats?.activePlayersCount ?? players.filter((p) => p.status === 'active').length,
-    onlinePlayersCount: stats?.onlinePlayersCount ?? players.filter((p) => p.is_online).length,
-    operatorsCount: stats?.operatorsCount ?? operators.length,
-    playlistsCount: stats?.playlistsCount ?? playlists.length,
-    mediaCount: stats?.mediaCount ?? mediaList.length,
-    plan: stats?.plan || {
-      id: 'plan-call-inter',
-      name: 'Call Intermediário',
-      description: '3 telas com chamadas e até 12 operadores.',
-      max_players: 3,
-      max_operators: 12,
-      max_storage: 150,
-      monthly_price: 109,
-      active: true,
-    },
-    limits: {
-      max_players: stats?.limits?.max_players || 3,
-      max_operators: stats?.limits?.max_operators ?? 12,
-      max_storage: stats?.limits?.max_storage || 150,
-    },
-  };
 
   // Modals
   const [playerModalOpen, setPlayerModalOpen] = useState(false);
@@ -136,13 +110,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
   // Unique Direct Access Player Link Modal & copy state
   const [playerDirectLinkModal, setPlayerDirectLinkModal] = useState<{
-    isOpen: boolean;
-    player: Player | null;
-  }>({
-    isOpen: false,
-    player: null,
-  });
-  const [androidBoxModal, setAndroidBoxModal] = useState<{
     isOpen: boolean;
     player: Player | null;
   }>({
@@ -458,7 +425,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         password: '',
       });
     } else {
-      if ((safeStats.limits?.max_operators ?? 12) === 0) {
+      if (stats.limits.max_operators === 0) {
         showToast('error', 'Seu plano atual é exclusivo para exibição de mídia e notícias RSS (sem operador). Solicite alteração para a Linha Call para habilitar operadores.');
         return;
       }
@@ -1046,7 +1013,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       </div>
 
       {/* VIEW: DASHBOARD MINIMALISTA COM LIMITES DO PLANO */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && stats && (
         <div className="space-y-8">
           {/* 4 Cards de Métricas */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1058,12 +1025,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <Monitor className="h-4 w-4 text-blue-400" />
               </div>
               <p className="mt-2 text-2xl font-bold text-white tracking-tight">
-                {safeStats.activePlayersCount}{' '}
-                <span className="text-xs font-normal text-slate-400">/ {safeStats.playersCount} total</span>
+                {stats.activePlayersCount}{' '}
+                <span className="text-xs font-normal text-slate-400">/ {stats.playersCount} total</span>
               </p>
               <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] font-medium">{safeStats.onlinePlayersCount} online no momento</span>
+                <span className="text-[11px] font-medium">{stats.onlinePlayersCount} online no momento</span>
               </div>
             </div>
 
@@ -1074,7 +1041,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <Users className="h-4 w-4 text-emerald-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.operatorsCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.operatorsCount}</p>
               <p className="mt-2 text-xs text-slate-400">Atendentes autorizados</p>
             </div>
 
@@ -1085,7 +1052,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <Film className="h-4 w-4 text-purple-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.playlistsCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.playlistsCount}</p>
               <p className="mt-2 text-xs text-slate-400">Grades de reprodução</p>
             </div>
 
@@ -1096,7 +1063,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <ImageIcon className="h-4 w-4 text-amber-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.mediaCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.mediaCount}</p>
               <p className="mt-2 text-xs text-slate-400">Imagens e vídeos</p>
             </div>
           </div>
@@ -1106,14 +1073,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Limites do Plano: {safeStats.plan?.name || 'Plano Personalizado'}
+                  Limites do Plano: {stats.plan?.name || 'Plano Personalizado'}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Consumo em tempo real em relação à cota máxima contratada
                 </p>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800/80">
-                R$ {Number(safeStats.plan?.monthly_price || 0).toFixed(2)}/mês
+                R$ {Number(stats.plan?.monthly_price || 0).toFixed(2)}/mês
               </span>
             </div>
 
@@ -1123,14 +1090,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Players Utilizados</span>
                   <span className="font-semibold text-white">
-                    {safeStats.playersCount} / {safeStats.limits.max_players}
+                    {stats.playersCount} / {stats.limits.max_players}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full"
                     style={{
-                      width: `${Math.min(100, (safeStats.playersCount / Math.max(1, safeStats.limits.max_players)) * 100)}%`,
+                      width: `${Math.min(100, (stats.playersCount / stats.limits.max_players) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1141,18 +1108,18 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Operadores de Atendimento</span>
                   <span className="font-semibold text-white">
-                    {safeStats.limits.max_operators === 0 ? (
+                    {stats.limits.max_operators === 0 ? (
                       <span className="text-amber-400 font-bold text-[10px] uppercase">Não incluído (Linha Show)</span>
                     ) : (
-                      `${safeStats.operatorsCount} / ${safeStats.limits.max_operators}`
+                      `${stats.operatorsCount} / ${stats.limits.max_operators}`
                     )}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${safeStats.limits.max_operators === 0 ? 'bg-amber-500/30' : 'bg-emerald-500'}`}
+                    className={`h-full rounded-full ${stats.limits.max_operators === 0 ? 'bg-amber-500/30' : 'bg-emerald-500'}`}
                     style={{
-                      width: safeStats.limits.max_operators === 0 ? '0%' : `${Math.min(100, (safeStats.operatorsCount / Math.max(1, safeStats.limits.max_operators)) * 100)}%`,
+                      width: stats.limits.max_operators === 0 ? '0%' : `${Math.min(100, (stats.operatorsCount / Math.max(1, stats.limits.max_operators)) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1163,14 +1130,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Mídias em Armazenamento</span>
                   <span className="font-semibold text-white">
-                    {safeStats.mediaCount} / {safeStats.limits.max_storage}
+                    {stats.mediaCount} / {stats.limits.max_storage}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
                     className="h-full bg-amber-500 rounded-full"
                     style={{
-                      width: `${Math.min(100, (safeStats.mediaCount / Math.max(1, safeStats.limits.max_storage)) * 100)}%`,
+                      width: `${Math.min(100, (stats.mediaCount / stats.limits.max_storage) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1437,14 +1404,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                           >
                             <Link2 className="h-4 w-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setAndroidBoxModal({ isOpen: true, player: p })}
-                            className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-950/50 transition cursor-pointer"
-                            title="Configurar TV Box Android & Iniciar ao Ligar"
-                          >
-                            <Tv className="h-4 w-4" />
-                          </button>
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -1560,7 +1519,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       {/* VIEW: OPERADORES */}
       {activeTab === 'operators' && (
         <div className="space-y-6">
-          {(safeStats.limits?.max_operators ?? 12) === 0 && (
+          {stats.limits.max_operators === 0 && (
             <div className="rounded-xl border border-amber-800/80 bg-amber-950/40 p-4 text-amber-200 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="rounded-lg bg-amber-900/60 p-2 text-amber-300">
@@ -1568,7 +1527,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-100">
-                    Plano de Exibição / Sem Operador ({safeStats.plan?.name || 'Linha Show'})
+                    Plano de Exibição / Sem Operador ({stats.plan?.name || 'Linha Show'})
                   </h4>
                   <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
                     Este plano foi configurado exclusivamente para transmissão de mídias institucionais, propagandas, previsão do tempo, relógio e notícias RSS na tela sem chamadas de guichê. Caso necessite chamar senhas ou clientes, solicite a alteração para um dos planos da <strong>Linha Call</strong> (com 4 operadores por tela).
@@ -1585,13 +1544,13 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </div>
             <button
               onClick={() => handleOpenOperatorModal()}
-              disabled={(safeStats.limits?.max_operators ?? 12) === 0}
+              disabled={stats.limits.max_operators === 0}
               className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 min-h-[44px] text-xs font-bold uppercase tracking-wider shadow-sm transition w-full sm:w-auto ${
-                (safeStats.limits?.max_operators ?? 12) === 0
+                stats.limits.max_operators === 0
                   ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
                   : 'bg-blue-600 text-white hover:bg-blue-500 cursor-pointer'
               }`}
-              title={(safeStats.limits?.max_operators ?? 12) === 0 ? 'Plano sem operadores' : 'Cadastrar novo operador'}
+              title={stats.limits.max_operators === 0 ? 'Plano sem operadores' : 'Cadastrar novo operador'}
             >
               <Plus className="h-4 w-4" />
               <span>Novo Operador</span>
@@ -1933,14 +1892,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     </div>
                   ) : m.type === 'video' ? (
                     <video
-                      src={formatMediaUrl(m.file_url)}
+                      src={m.file_url}
                       muted
                       className="h-full w-full object-cover"
                       poster=""
                     />
                   ) : (
                     <img
-                      src={formatMediaUrl(m.file_url)}
+                      src={m.file_url}
                       alt={m.name}
                       referrerPolicy="no-referrer"
                       className="h-full w-full object-cover"
@@ -3962,20 +3921,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <p className="text-slate-300 leading-relaxed text-[11px]">
                   Ao abrir este link em qualquer aparelho (Smart TV, TV Box, Mini PC ou Monitor), o reprodutor carrega e inicia a exibição imediatamente sem pedir código, login ou senha.
                 </p>
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const p = playerDirectLinkModal.player;
-                      setPlayerDirectLinkModal({ isOpen: false, player: null });
-                      if (p) setAndroidBoxModal({ isOpen: true, player: p });
-                    }}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 text-xs shadow-sm transition cursor-pointer"
-                  >
-                    <Tv className="h-3.5 w-3.5" />
-                    <span>Ver Passo a Passo: Instalar na TV Box e Iniciar ao Ligar</span>
-                  </button>
-                </div>
               </div>
 
               {/* Link Input & Copy */}
@@ -4079,15 +4024,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         message={confirmData.message}
         onConfirm={confirmData.action}
         onCancel={() => setConfirmData((p) => ({ ...p, isOpen: false }))}
-      />
-
-      {/* GUIA TV BOX ANDROID & AUTO-START */}
-      <AndroidBoxSetupModal
-        isOpen={androidBoxModal.isOpen}
-        onClose={() => setAndroidBoxModal({ isOpen: false, player: null })}
-        playerCode={androidBoxModal.player?.code}
-        playerToken={androidBoxModal.player?.access_token}
-        playerName={androidBoxModal.player?.name}
       />
     </div>
   );
