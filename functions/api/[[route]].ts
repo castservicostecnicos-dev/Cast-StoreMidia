@@ -279,6 +279,7 @@ export const onRequest = async (context: CloudflareContext): Promise<Response> =
   if (path === '/company/stats') {
     return jsonResponse({
       playersCount: 2,
+      activePlayersCount: 2,
       onlinePlayersCount: 2,
       operatorsCount: 1,
       playlistsCount: 1,
@@ -286,6 +287,21 @@ export const onRequest = async (context: CloudflareContext): Promise<Response> =
       storageUsedMb: 25,
       maxStorageMb: 150,
       todayCallsCount: edgeCalls.length,
+      plan: {
+        id: 'plan-call-inter',
+        name: 'Call Intermediário',
+        description: '3 telas com chamadas e até 12 operadores.',
+        max_players: 3,
+        max_operators: 12,
+        max_storage: 150,
+        monthly_price: 109.0,
+        active: true,
+      },
+      limits: {
+        max_players: 3,
+        max_operators: 12,
+        max_storage: 150,
+      },
       planName: 'Call Intermediário',
     });
   }
@@ -479,7 +495,7 @@ export const onRequest = async (context: CloudflareContext): Promise<Response> =
   // Player Current
   if (path === '/player/current') {
     const code = (url.searchParams.get('code') || 'TV-1001').toUpperCase();
-    const isVertical = code.includes('VERT') || code.includes('1002');
+    const isVertical = code.includes('VERT') || code.includes('1002') || code.includes('SALA-02');
     const now = new Date().toISOString();
 
     return jsonResponse({

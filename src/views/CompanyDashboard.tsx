@@ -70,6 +70,31 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const [rssList, setRssList] = useState<RssFeed[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Safe stats object with robust fallbacks to prevent runtime crashes if backend returns partial data
+  const safeStats: CompanyStats = {
+    playersCount: stats?.playersCount ?? players.length,
+    activePlayersCount: stats?.activePlayersCount ?? players.filter((p) => p.status === 'active').length,
+    onlinePlayersCount: stats?.onlinePlayersCount ?? players.filter((p) => p.is_online).length,
+    operatorsCount: stats?.operatorsCount ?? operators.length,
+    playlistsCount: stats?.playlistsCount ?? playlists.length,
+    mediaCount: stats?.mediaCount ?? mediaList.length,
+    plan: stats?.plan || {
+      id: 'plan-call-inter',
+      name: 'Call Intermediário',
+      description: '3 telas com chamadas e até 12 operadores.',
+      max_players: 3,
+      max_operators: 12,
+      max_storage: 150,
+      monthly_price: 109,
+      active: true,
+    },
+    limits: {
+      max_players: stats?.limits?.max_players || 3,
+      max_operators: stats?.limits?.max_operators ?? 12,
+      max_storage: stats?.limits?.max_storage || 150,
+    },
+  };
+
   // Modals
   const [playerModalOpen, setPlayerModalOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -433,7 +458,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         password: '',
       });
     } else {
-      if (stats.limits.max_operators === 0) {
+      if ((safeStats.limits?.max_operators ?? 12) === 0) {
         showToast('error', 'Seu plano atual é exclusivo para exibição de mídia e notícias RSS (sem operador). Solicite alteração para a Linha Call para habilitar operadores.');
         return;
       }
@@ -1021,7 +1046,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       </div>
 
       {/* VIEW: DASHBOARD MINIMALISTA COM LIMITES DO PLANO */}
-      {activeTab === 'dashboard' && stats && (
+      {activeTab === 'dashboard' && (
         <div className="space-y-8">
           {/* 4 Cards de Métricas */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1033,12 +1058,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <Monitor className="h-4 w-4 text-blue-400" />
               </div>
               <p className="mt-2 text-2xl font-bold text-white tracking-tight">
-                {stats.activePlayersCount}{' '}
-                <span className="text-xs font-normal text-slate-400">/ {stats.playersCount} total</span>
+                {safeStats.activePlayersCount}{' '}
+                <span className="text-xs font-normal text-slate-400">/ {safeStats.playersCount} total</span>
               </p>
               <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] font-medium">{stats.onlinePlayersCount} online no momento</span>
+                <span className="text-[11px] font-medium">{safeStats.onlinePlayersCount} online no momento</span>
               </div>
             </div>
 
@@ -1049,7 +1074,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <Users className="h-4 w-4 text-emerald-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.operatorsCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.operatorsCount}</p>
               <p className="mt-2 text-xs text-slate-400">Atendentes autorizados</p>
             </div>
 
@@ -1060,7 +1085,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <Film className="h-4 w-4 text-purple-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.playlistsCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.playlistsCount}</p>
               <p className="mt-2 text-xs text-slate-400">Grades de reprodução</p>
             </div>
 
@@ -1071,7 +1096,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </span>
                 <ImageIcon className="h-4 w-4 text-amber-400" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.mediaCount}</p>
+              <p className="mt-2 text-2xl font-bold text-white tracking-tight">{safeStats.mediaCount}</p>
               <p className="mt-2 text-xs text-slate-400">Imagens e vídeos</p>
             </div>
           </div>
@@ -1081,14 +1106,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Limites do Plano: {stats.plan?.name || 'Plano Personalizado'}
+                  Limites do Plano: {safeStats.plan?.name || 'Plano Personalizado'}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Consumo em tempo real em relação à cota máxima contratada
                 </p>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800/80">
-                R$ {Number(stats.plan?.monthly_price || 0).toFixed(2)}/mês
+                R$ {Number(safeStats.plan?.monthly_price || 0).toFixed(2)}/mês
               </span>
             </div>
 
@@ -1098,14 +1123,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Players Utilizados</span>
                   <span className="font-semibold text-white">
-                    {stats.playersCount} / {stats.limits.max_players}
+                    {safeStats.playersCount} / {safeStats.limits.max_players}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
                     className="h-full bg-blue-500 rounded-full"
                     style={{
-                      width: `${Math.min(100, (stats.playersCount / stats.limits.max_players) * 100)}%`,
+                      width: `${Math.min(100, (safeStats.playersCount / Math.max(1, safeStats.limits.max_players)) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1116,18 +1141,18 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Operadores de Atendimento</span>
                   <span className="font-semibold text-white">
-                    {stats.limits.max_operators === 0 ? (
+                    {safeStats.limits.max_operators === 0 ? (
                       <span className="text-amber-400 font-bold text-[10px] uppercase">Não incluído (Linha Show)</span>
                     ) : (
-                      `${stats.operatorsCount} / ${stats.limits.max_operators}`
+                      `${safeStats.operatorsCount} / ${safeStats.limits.max_operators}`
                     )}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
-                    className={`h-full rounded-full ${stats.limits.max_operators === 0 ? 'bg-amber-500/30' : 'bg-emerald-500'}`}
+                    className={`h-full rounded-full ${safeStats.limits.max_operators === 0 ? 'bg-amber-500/30' : 'bg-emerald-500'}`}
                     style={{
-                      width: stats.limits.max_operators === 0 ? '0%' : `${Math.min(100, (stats.operatorsCount / Math.max(1, stats.limits.max_operators)) * 100)}%`,
+                      width: safeStats.limits.max_operators === 0 ? '0%' : `${Math.min(100, (safeStats.operatorsCount / Math.max(1, safeStats.limits.max_operators)) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1138,14 +1163,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Mídias em Armazenamento</span>
                   <span className="font-semibold text-white">
-                    {stats.mediaCount} / {stats.limits.max_storage}
+                    {safeStats.mediaCount} / {safeStats.limits.max_storage}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
                     className="h-full bg-amber-500 rounded-full"
                     style={{
-                      width: `${Math.min(100, (stats.mediaCount / stats.limits.max_storage) * 100)}%`,
+                      width: `${Math.min(100, (safeStats.mediaCount / Math.max(1, safeStats.limits.max_storage)) * 100)}%`,
                     }}
                   />
                 </div>
@@ -1535,7 +1560,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       {/* VIEW: OPERADORES */}
       {activeTab === 'operators' && (
         <div className="space-y-6">
-          {stats.limits.max_operators === 0 && (
+          {(safeStats.limits?.max_operators ?? 12) === 0 && (
             <div className="rounded-xl border border-amber-800/80 bg-amber-950/40 p-4 text-amber-200 shadow-sm">
               <div className="flex items-start gap-3">
                 <div className="rounded-lg bg-amber-900/60 p-2 text-amber-300">
@@ -1543,7 +1568,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-100">
-                    Plano de Exibição / Sem Operador ({stats.plan?.name || 'Linha Show'})
+                    Plano de Exibição / Sem Operador ({safeStats.plan?.name || 'Linha Show'})
                   </h4>
                   <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
                     Este plano foi configurado exclusivamente para transmissão de mídias institucionais, propagandas, previsão do tempo, relógio e notícias RSS na tela sem chamadas de guichê. Caso necessite chamar senhas ou clientes, solicite a alteração para um dos planos da <strong>Linha Call</strong> (com 4 operadores por tela).
@@ -1560,13 +1585,13 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </div>
             <button
               onClick={() => handleOpenOperatorModal()}
-              disabled={stats.limits.max_operators === 0}
+              disabled={(safeStats.limits?.max_operators ?? 12) === 0}
               className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 min-h-[44px] text-xs font-bold uppercase tracking-wider shadow-sm transition w-full sm:w-auto ${
-                stats.limits.max_operators === 0
+                (safeStats.limits?.max_operators ?? 12) === 0
                   ? 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
                   : 'bg-blue-600 text-white hover:bg-blue-500 cursor-pointer'
               }`}
-              title={stats.limits.max_operators === 0 ? 'Plano sem operadores' : 'Cadastrar novo operador'}
+              title={(safeStats.limits?.max_operators ?? 12) === 0 ? 'Plano sem operadores' : 'Cadastrar novo operador'}
             >
               <Plus className="h-4 w-4" />
               <span>Novo Operador</span>
