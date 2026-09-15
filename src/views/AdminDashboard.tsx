@@ -34,9 +34,10 @@ import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
 interface AdminDashboardProps {
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
   onLogout: () => void;
-  onQuickSwitchRole?: (role: 'admin' | 'company' | 'operator' | 'player') => void;
+  onQuickSwitchRole?: (role: string) => void;
   onOpenPlayerSimulation?: (code: string) => void;
   onOpenPresentation?: () => void;
+  onSeedDemoData?: () => Promise<any>;
 }
 
 const PLAN_TEMPLATES = [
@@ -108,8 +109,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onQuickSwitchRole,
   onOpenPlayerSimulation,
   onOpenPresentation,
+  onSeedDemoData,
 }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'companies' | 'plans' | 'drive'>('dashboard');
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [selectedDemoClient, setSelectedDemoClient] = useState<'comp-1' | 'comp-2'>('comp-1');
   const [stats, setStats] = useState<AdminStats>({
     totalCompanies: 0,
     activeCompanies: 0,
@@ -220,6 +224,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       showToast('error', err.message || 'Erro ao carregar dados do painel.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSeedDemoData = async () => {
+    setIsSeeding(true);
+    try {
+      const res = onSeedDemoData ? await onSeedDemoData() : await api.seedDemoData();
+      showToast('success', res.message || 'Dados de teste carregados com sucesso!');
+      await loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao carregar dados de teste.');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -536,6 +553,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Apresentação Comercial (PDF)</span>
             </button>
           )}
+
+          <button
+            id="btn-admin-top-seed-data"
+            type="button"
+            onClick={handleSeedDemoData}
+            disabled={isSeeding}
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition cursor-pointer border border-emerald-500/40 disabled:opacity-50"
+            title="Carregar / Restaurar Dados de Teste (Empresas, Operadores e Telas) para Apresentação"
+          >
+            {isSeeding ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                <span>Carregando Dados...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                <span>Carregar Dados de Teste</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -651,13 +689,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {/* Acessos Rápidos do Sistema (Exclusivo Admin Geral) */}
           <div className="rounded-xl border border-blue-900/50 bg-slate-800/95 p-6 shadow-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-4 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-700/80 pb-5 mb-6">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0 mt-1 sm:mt-0">
                   <Shield className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                       Acessos Rápidos do Sistema
                     </h3>
@@ -666,10 +704,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       Privativo do Admin Geral
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Acessos rápidos de teste transferidos com segurança da tela de login para controle exclusivo do Administrador Geral.
+                  <p className="text-xs text-slate-400 mt-1">
+                    Carregue dados de teste a qualquer momento para demonstração e alterne entre perfis com um clique.
                   </p>
                 </div>
+              </div>
+
+              {/* Botão Principal: Carregar Dados de Teste */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  id="btn-seed-test-data"
+                  type="button"
+                  onClick={handleSeedDemoData}
+                  disabled={isSeeding}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-950/40 border border-emerald-400/40 disabled:opacity-50"
+                  title="Restaura empresas, operadores, telas e mídias de demonstração para apresentação comercial"
+                >
+                  {isSeeding ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      <span>Carregando Dados de Teste...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 text-amber-300" />
+                      <span>Carregar Dados de Teste</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Alternador de Clientes Demo para Apresentação */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 p-3 rounded-lg bg-slate-900/70 border border-slate-700/60">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cliente de Demonstração:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDemoClient('comp-1')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                    selectedDemoClient === 'comp-1'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+                  }`}
+                >
+                  1. Farmácia (Drogaria SP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDemoClient('comp-2')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                    selectedDemoClient === 'comp-2'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+                  }`}
+                >
+                  2. Supermercado (Hortifruti)
+                </button>
               </div>
             </div>
 
@@ -712,149 +805,304 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 2. Empresa */}
-              <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-5 flex flex-col justify-between hover:border-blue-700/60 transition">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60">
-                      Painel da Empresa
-                    </span>
-                    <Building2 className="h-5 w-5 text-blue-400" />
-                  </div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Empresa</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Drogarias SP • Gestão de mídias, playlists, telas e notícias RSS.
-                  </p>
-
-                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Login:</span>
-                      <span className="font-semibold text-blue-300 select-all truncate ml-2">empresa@drogariasp.com.br</span>
+              {/* 2. Empresa Demo Selecionada */}
+              {selectedDemoClient === 'comp-1' ? (
+                <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-5 flex flex-col justify-between hover:border-blue-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60">
+                        Painel da Empresa
+                      </span>
+                      <Building2 className="h-5 w-5 text-blue-400" />
                     </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
-                      <span className="text-slate-200 font-bold select-all">123456</span>
-                    </div>
-                  </div>
-                </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Drogarias SP</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Farmácia • Gestão de mídias, playlists, telas e chamadas com voz.
+                    </p>
 
-                <div className="mt-4 pt-3 border-t border-blue-900/40 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onQuickSwitchRole?.('company')}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
-                  >
-                    <span>Entrar Empresa</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText('empresa@drogariasp.com.br\n123456', 'company_cred', 'Credenciais da Empresa')}
-                    title="Copiar dados"
-                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
-                  >
-                    {copiedKey === 'company_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. Operador */}
-              <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 flex flex-col justify-between hover:border-emerald-700/60 transition">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/60">
-                      Painel Operacional
-                    </span>
-                    <Radio className="h-5 w-5 text-emerald-400" />
-                  </div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operador</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Balcão • Chamada por voz na TV, fila preferencial e frases fixas.
-                  </p>
-
-                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Login:</span>
-                      <span className="font-semibold text-emerald-300 select-all truncate ml-2">operador@drogariasp.com.br</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
-                      <span className="text-slate-200 font-bold select-all">123456</span>
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                        <span className="font-semibold text-blue-300 select-all truncate ml-2">empresa@drogariasp.com.br</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                        <span className="text-slate-200 font-bold select-all">123456</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-4 pt-3 border-t border-emerald-900/40 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onQuickSwitchRole?.('operator')}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
-                  >
-                    <span>Entrar Operador</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText('operador@drogariasp.com.br\n123456', 'operator_cred', 'Credenciais do Operador')}
-                    title="Copiar dados"
-                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
-                  >
-                    {copiedKey === 'operator_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. Player TV */}
-              <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-5 flex flex-col justify-between hover:border-amber-700/60 transition">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/60">
-                      Reprodução Ao Vivo
-                    </span>
-                    <Tv className="h-5 w-5 text-amber-400" />
-                  </div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. Player (TV)</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Terminal receptor • Notícias RSS, hora, clima em tempo real e chamadas.
-                  </p>
-
-                  <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Código TV:</span>
-                      <span className="font-bold text-amber-300 select-all tracking-wider">PLAY-REC-01</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span className="text-slate-500 text-[10px] uppercase">Local:</span>
-                      <span className="text-slate-300 truncate">Balcão Principal</span>
-                    </div>
+                  <div className="mt-4 pt-3 border-t border-blue-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onQuickSwitchRole?.('company')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Entrar Empresa</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('empresa@drogariasp.com.br\n123456', 'company_cred', 'Credenciais da Empresa')}
+                      title="Copiar dados"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'company_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <div className="rounded-xl border border-blue-800/40 bg-blue-950/20 p-5 flex flex-col justify-between hover:border-blue-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-700/60">
+                        Painel da Empresa
+                      </span>
+                      <Building2 className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Supermercado Central</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Varejo Hortifruti • Gestão de ofertas, caixas rápidos e telas.
+                    </p>
 
-                <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onOpenPlayerSimulation) {
-                        onOpenPlayerSimulation('PLAY-REC-01');
-                      } else if (onQuickSwitchRole) {
-                        onQuickSwitchRole('player');
-                      }
-                    }}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
-                  >
-                    <span>Abrir Player</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText('PLAY-REC-01', 'player_code', 'Código do Player')}
-                    title="Copiar código"
-                    className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
-                  >
-                    {copiedKey === 'player_code' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                  </button>
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                        <span className="font-semibold text-blue-300 select-all truncate ml-2">empresa@supermercado.com.br</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                        <span className="text-slate-200 font-bold select-all">123456</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-blue-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onQuickSwitchRole?.('company-2')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Entrar Supermercado</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('empresa@supermercado.com.br\n123456', 'company2_cred', 'Credenciais do Supermercado')}
+                      title="Copiar dados"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'company2_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* 3. Operador Demo Selecionado */}
+              {selectedDemoClient === 'comp-1' ? (
+                <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 flex flex-col justify-between hover:border-emerald-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/60">
+                        Painel Operacional
+                      </span>
+                      <Radio className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operador (Carlos)</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Balcão 01 • Chamada por voz na TV, fila preferencial e avisos.
+                    </p>
+
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                        <span className="font-semibold text-emerald-300 select-all truncate ml-2">operador@drogariasp.com.br</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                        <span className="text-slate-200 font-bold select-all">123456</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-emerald-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onQuickSwitchRole?.('operator')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Entrar Operador</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('operador@drogariasp.com.br\n123456', 'operator_cred', 'Credenciais do Operador')}
+                      title="Copiar dados"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'operator_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-5 flex flex-col justify-between hover:border-emerald-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/60">
+                        Painel Operacional
+                      </span>
+                      <Radio className="h-5 w-5 text-emerald-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operadora (Ana)</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Caixa Rápido 01 • Chamada rápida no painel e som ding-dong.
+                    </p>
+
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Login:</span>
+                        <span className="font-semibold text-emerald-300 select-all truncate ml-2">operador@supermercado.com.br</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Senha:</span>
+                        <span className="text-slate-200 font-bold select-all">123456</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-emerald-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onQuickSwitchRole?.('operator-2')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Entrar Operadora</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('operador@supermercado.com.br\n123456', 'operator2_cred', 'Credenciais da Operadora')}
+                      title="Copiar dados"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'operator2_cred' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Player TV Demo Selecionado */}
+              {selectedDemoClient === 'comp-1' ? (
+                <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-5 flex flex-col justify-between hover:border-amber-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/60">
+                        Reprodução Ao Vivo
+                      </span>
+                      <Tv className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. TV Recepção</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Drogaria SP • Notícias G1, hora, clima em tempo real e voz de chamada.
+                    </p>
+
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Código TV:</span>
+                        <span className="font-bold text-amber-300 select-all tracking-wider">PLAY-REC-01</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Local:</span>
+                        <span className="text-slate-300 truncate">Balcão Principal</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenPlayerSimulation) {
+                          onOpenPlayerSimulation('PLAY-REC-01');
+                        } else if (onQuickSwitchRole) {
+                          onQuickSwitchRole('player');
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Abrir Player</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('PLAY-REC-01', 'player_code', 'Código do Player')}
+                      title="Copiar código"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'player_code' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-5 flex flex-col justify-between hover:border-amber-700/60 transition">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/60">
+                        Reprodução Ao Vivo
+                      </span>
+                      <Tv className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. TV Salão Vendas</h4>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Supermercado • Ofertas de hortifruti, clima, relógio e avisos de caixa.
+                    </p>
+
+                    <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Código TV:</span>
+                        <span className="font-bold text-amber-300 select-all tracking-wider">PLAY-MERC-02</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span className="text-slate-500 text-[10px] uppercase">Local:</span>
+                        <span className="text-slate-300 truncate">Salão Principal</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-amber-900/40 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenPlayerSimulation) {
+                          onOpenPlayerSimulation('PLAY-MERC-02');
+                        } else if (onQuickSwitchRole) {
+                          onQuickSwitchRole('player-2');
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow-sm"
+                    >
+                      <span>Abrir Player</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('PLAY-MERC-02', 'player2_code', 'Código do Player')}
+                      title="Copiar código"
+                      className="p-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                    >
+                      {copiedKey === 'player2_code' ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso explicativo para o apresentador */}
+            <div className="mt-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 flex items-center gap-2 text-xs text-slate-400">
+              <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Dica para apresentações:</strong> Caso alguma empresa ou tela tenha sido excluída em testes anteriores, basta clicar em <strong>&ldquo;Carregar Dados de Teste&rdquo;</strong> acima para reconstruir instantaneamente os 2 clientes com todas as mídias, operadores e telas de TV.
+              </span>
             </div>
           </div>
 

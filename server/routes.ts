@@ -19,6 +19,7 @@ import {
   PlayerCall,
   seedDefaultRssFeedsForCompany,
   DEFAULT_RSS_FEEDS,
+  DEFAULT_PLANS,
 } from './db.js';
 import { realtimeHub } from './realtime.js';
 
@@ -98,9 +99,34 @@ function requireRole(...allowedRoles: Array<'admin' | 'company' | 'operator' | '
 // ----------------------------------------------------
 // 1. AUTHENTICATION
 // ----------------------------------------------------
+apiRouter.post('/auth/seed-demo-data', (_req, res) => {
+  try {
+    const result = db.seedDemoData();
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Erro ao semear dados de teste:', err);
+    return res.status(500).json({ error: 'Falha ao carregar dados de teste: ' + err.message });
+  }
+});
+
 apiRouter.post('/auth/login', (req, res) => {
   const { email, password, playerCode, playerToken, token: inputToken } = req.body;
-  const data = db.getData();
+  let data = db.getData();
+
+  // Se for uma tentativa de login de demonstração ou código demo e não existir no banco, auto-restaura dados demo
+  const isDemoRequest =
+    (playerCode && ['PLAY-REC-01', 'PLAY-SALA-02', 'PLAY-MERC-02'].includes(String(playerCode).trim().toUpperCase())) ||
+    (email && ['empresa@drogariasp.com.br', 'operador@drogariasp.com.br', 'empresa@supermercado.com.br', 'operador@supermercado.com.br'].includes(String(email).trim().toLowerCase()));
+
+  if (isDemoRequest) {
+    const playerExists = playerCode ? data.players.some((p) => p.code.toUpperCase() === String(playerCode).trim().toUpperCase()) : true;
+    const userExists = email ? data.users.some((u) => u.email.toLowerCase() === String(email).trim().toLowerCase()) : true;
+    if (!playerExists || !userExists) {
+      console.log('Detectado acesso a credencial de demonstração ausente. Restaurando dados de teste automaticamente...');
+      db.seedDemoData();
+      data = db.getData();
+    }
+  }
 
   // Alternative login by player token or player code (e.g. for TV / Player screen auto-launch)
   const effectiveToken = (playerToken || inputToken || (playerCode && String(playerCode).trim().startsWith('tok_') ? playerCode : null))?.trim();
@@ -280,6 +306,16 @@ apiRouter.post('/auth/forgot-password', (req, res) => {
 // ----------------------------------------------------
 // 2. ADMIN GERAL
 // ----------------------------------------------------
+apiRouter.post('/admin/seed-demo-data', requireAuth, requireRole('admin'), (_req, res) => {
+  try {
+    const result = db.seedDemoData();
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Erro ao semear dados de teste:', err);
+    return res.status(500).json({ error: 'Falha ao carregar dados de teste: ' + err.message });
+  }
+});
+
 apiRouter.get('/admin/stats', requireAuth, requireRole('admin'), (_req, res) => {
   const data = db.getData();
   const totalCompanies = data.companies.length;
@@ -317,10 +353,6 @@ apiRouter.get('/admin/companies', requireAuth, requireRole('admin'), (_req, res)
 
 apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res) => {
   const {
-    legal_name,
-    trade_name,
-    cnpj,
-    email,
     phone,
     responsible,
     address,
@@ -332,14 +364,33 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     password,
   } = req.body;
 
-  if (!legal_name || !trade_name || !cnpj || !email) {
-    return res.status(400).json({ error: 'Preencha todos os campos obrigatórios (Nome Fantasia, Razão Social, CNPJ e E-mail).' });
+  // Resilient field mapping with aliases
+  const rawTradeName = String(req.body.trade_name || req.body.name || req.body.fantasy_name || '').trim();
+  const rawLegalName = String(req.body.legal_name || req.body.razao_social || '').trim();
+  const rawEmail = String(req.body.email || req.body.admin_email || '').trim().toLowerCase();
+  const rawCnpj = String(req.body.cnpj || req.body.document || req.body.cpf_cnpj || '').trim();
+
+  // If one of the names is missing, fallback to the other
+  const trade_name = rawTradeName || rawLegalName;
+  const legal_name = rawLegalName || rawTradeName;
+  const cleanEmail = rawEmail;
+  const cleanCnpj = rawCnpj || '00.000.000/0001-00';
+
+  if (!trade_name) {
+    return res.status(400).json({ error: 'O Nome da empresa (Nome Fantasia) é obrigatório.' });
   }
 
-  const cleanEmail = String(email).trim().toLowerCase();
-  const cleanCnpj = String(cnpj).trim();
+  if (!cleanEmail) {
+    return res.status(400).json({ error: 'O E-mail de login da empresa é obrigatório.' });
+  }
 
   const data = db.getData();
+
+  // Ensure DEFAULT_PLANS exist if plans list was empty
+  if (!data.plans || data.plans.length === 0) {
+    const now = new Date().toISOString();
+    data.plans = DEFAULT_PLANS.map((p) => ({ ...p, created_at: now, updated_at: now }));
+  }
 
   // Validate plan
   let selectedPlanId = plan_id;
@@ -364,10 +415,10 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     return res.status(400).json({ error: `O e-mail "${cleanEmail}" já está vinculado à empresa "${existingCompanyEmail.trade_name}".` });
   }
 
-  // Check duplicate CNPJ
-  const rawCnpj = cleanCnpj.replace(/\D/g, '');
-  if (rawCnpj.length >= 11) {
-    const existingCompanyCnpj = data.companies.find((c) => c.cnpj.replace(/\D/g, '') === rawCnpj);
+  // Check duplicate CNPJ if not generic placeholder
+  const rawCnpjDigits = cleanCnpj.replace(/\D/g, '');
+  if (rawCnpjDigits.length >= 11 && !/^0+$/.test(rawCnpjDigits)) {
+    const existingCompanyCnpj = data.companies.find((c) => c.cnpj.replace(/\D/g, '') === rawCnpjDigits);
     if (existingCompanyCnpj) {
       return res.status(400).json({ error: `O CNPJ "${cleanCnpj}" já está cadastrado para a empresa "${existingCompanyCnpj.trade_name}".` });
     }
@@ -377,8 +428,8 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
   const companyId = `comp-${Date.now()}`;
   const newCompany: Company = {
     id: companyId,
-    legal_name: String(legal_name).trim(),
-    trade_name: String(trade_name).trim(),
+    legal_name: legal_name,
+    trade_name: trade_name,
     cnpj: cleanCnpj,
     email: cleanEmail,
     phone: phone ? String(phone).trim() : '',
@@ -497,6 +548,10 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
     password,
   } = req.body;
 
+  const effectiveTradeName = req.body.trade_name || req.body.name || req.body.fantasy_name;
+  const effectiveLegalName = req.body.legal_name || req.body.razao_social;
+  const effectiveCnpj = req.body.cnpj || req.body.document || req.body.cpf_cnpj;
+
   // Handle email update and keep company user in sync
   if (email) {
     const cleanEmail = String(email).trim().toLowerCase();
@@ -516,10 +571,10 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
   }
 
   // Handle CNPJ duplicate check
-  if (cnpj) {
-    const cleanCnpj = String(cnpj).trim();
+  if (effectiveCnpj) {
+    const cleanCnpj = String(effectiveCnpj).trim();
     const rawCnpj = cleanCnpj.replace(/\D/g, '');
-    if (rawCnpj.length >= 11) {
+    if (rawCnpj.length >= 11 && !/^0+$/.test(rawCnpj)) {
       const existingCompanyCnpj = data.companies.find(
         (c) => c.id !== id && c.cnpj.replace(/\D/g, '') === rawCnpj
       );
@@ -530,8 +585,8 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
     company.cnpj = cleanCnpj;
   }
 
-  if (legal_name) company.legal_name = String(legal_name).trim();
-  if (trade_name) company.trade_name = String(trade_name).trim();
+  if (effectiveLegalName) company.legal_name = String(effectiveLegalName).trim();
+  if (effectiveTradeName) company.trade_name = String(effectiveTradeName).trim();
   if (phone !== undefined) company.phone = String(phone).trim();
   if (responsible !== undefined) company.responsible = String(responsible).trim();
   if (address !== undefined) company.address = String(address).trim();

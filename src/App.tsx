@@ -111,28 +111,54 @@ export default function App() {
   };
 
   // Quick switch between accounts for fast testing
-  const handleQuickSwitchRole = async (targetRole: 'admin' | 'company' | 'operator' | 'player') => {
+  const handleQuickSwitchRole = async (targetRole: string) => {
     try {
       let credentials: any = {};
       if (targetRole === 'admin') {
         credentials = { email: 'ale11062@gmail.com', password: 'Admin@123456' };
-      } else if (targetRole === 'company') {
+      } else if (targetRole === 'company' || targetRole === 'company-1') {
         credentials = { email: 'empresa@drogariasp.com.br', password: '123456' };
-      } else if (targetRole === 'operator') {
+      } else if (targetRole === 'operator' || targetRole === 'operator-1') {
         credentials = { email: 'operador@drogariasp.com.br', password: '123456' };
-      } else if (targetRole === 'player') {
+      } else if (targetRole === 'player' || targetRole === 'player-1') {
         credentials = { playerCode: 'PLAY-REC-01' };
+      } else if (targetRole === 'company-2') {
+        credentials = { email: 'empresa@supermercado.com.br', password: '123456' };
+      } else if (targetRole === 'operator-2') {
+        credentials = { email: 'operador@supermercado.com.br', password: '123456' };
+      } else if (targetRole === 'player-2') {
+        credentials = { playerCode: 'PLAY-MERC-02' };
       }
 
-      const res = await api.login(credentials);
+      let res;
+      try {
+        res = await api.login(credentials);
+      } catch (loginErr: any) {
+        // Se a empresa foi excluída ou o usuário não existe, restaura dados demo e tenta novamente
+        console.warn('Conta demo não encontrada ou excluída. Restaurando dados de teste automaticamente...');
+        await api.seedDemoData();
+        res = await api.login(credentials);
+      }
+
       setStoredToken(res.token);
       setUser(res.user);
       setCompanyInfo(res.company);
       setCurrentPlayer(res.player);
       setSimulatedPlayerCode(null);
-      showToast('success', `Alternado para perfil: ${res.user.name}`);
+      showToast('success', `Alternado com sucesso para: ${res.user.name}`);
     } catch (err: any) {
       showToast('error', err.message || 'Erro ao alternar de perfil.');
+    }
+  };
+
+  const handleSeedDemoData = async () => {
+    try {
+      const res = await api.seedDemoData();
+      showToast('success', res.message || 'Dados de teste carregados com sucesso!');
+      return res;
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao carregar dados de teste.');
+      throw err;
     }
   };
 
@@ -193,7 +219,10 @@ export default function App() {
       <>
         <OfflineIndicator />
         <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
-        <LoginView onLoginSuccess={handleLoginSuccess} showToast={showToast} />
+        <LoginView
+          onLoginSuccess={handleLoginSuccess}
+          showToast={showToast}
+        />
       </>
     );
   }
@@ -244,6 +273,7 @@ export default function App() {
             onQuickSwitchRole={handleQuickSwitchRole}
             onOpenPlayerSimulation={(code) => setSimulatedPlayerCode(code)}
             onOpenPresentation={() => setPresentationOpen(true)}
+            onSeedDemoData={handleSeedDemoData}
           />
         )}
 

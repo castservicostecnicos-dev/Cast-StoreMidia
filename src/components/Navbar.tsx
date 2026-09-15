@@ -10,7 +10,7 @@ interface NavbarProps {
   onSelectTab: (tab: string) => void;
   onLogout: () => void;
   onChangePasswordClick: () => void;
-  onQuickSwitchRole?: (role: 'admin' | 'company' | 'operator' | 'player') => void;
+  onQuickSwitchRole?: (role: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -94,8 +94,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Demo Role Switcher (Exclusivo Admin Geral) */}
           {onQuickSwitchRole && user.role === 'admin' && (
             <div className="hidden xl:flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-700 text-xs text-slate-300">
-              <span className="px-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">Perfil:</span>
+              <span className="px-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">Acesso Rápido:</span>
               <button
+                type="button"
                 onClick={() => onQuickSwitchRole('admin')}
                 className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
                   user.role === 'admin' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -104,26 +105,34 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Admin
               </button>
               <button
+                type="button"
                 onClick={() => onQuickSwitchRole('company')}
-                className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
-                  user.role === 'company' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
+                className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-blue-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Entrar como Drogarias SP"
               >
-                Empresa
+                Farmácia
               </button>
               <button
+                type="button"
+                onClick={() => onQuickSwitchRole('company-2')}
+                className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-emerald-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Entrar como Supermercado Central"
+              >
+                Supermercado
+              </button>
+              <button
+                type="button"
                 onClick={() => onQuickSwitchRole('operator')}
-                className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
-                  user.role === 'operator' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
+                className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-amber-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Entrar como Operador"
               >
                 Operador
               </button>
               <button
+                type="button"
                 onClick={() => onQuickSwitchRole('player')}
-                className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
-                  user.role === 'player' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
+                className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-cyan-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Abrir Player TV"
               >
                 Player
               </button>

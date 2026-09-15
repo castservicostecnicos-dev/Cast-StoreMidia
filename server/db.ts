@@ -1017,6 +1017,575 @@ class DatabaseStore {
     this.save();
     return this.data.drive_settings;
   }
+
+  // ==========================================
+  // CARREGAR / RESTAURAR DADOS DE TESTE (DEMO)
+  // ==========================================
+  public seedDemoData(): {
+    message: string;
+    companiesCount: number;
+    operatorsCount: number;
+    playersCount: number;
+    demoClients: Array<{
+      id: string;
+      name: string;
+      segment: string;
+      companyEmail: string;
+      operatorEmail: string;
+      playerCode: string;
+      playerCodeSecondary?: string;
+    }>;
+  } {
+    const now = new Date().toISOString();
+    const demoPass = hashPassword('123456');
+
+    // 1. Garantir que os planos padrão existam
+    if (!this.data.plans || this.data.plans.length === 0) {
+      this.data.plans = DEFAULT_PLANS.map((p) => ({
+        ...p,
+        created_at: now,
+        updated_at: now,
+      }));
+    } else {
+      for (const defPlan of DEFAULT_PLANS) {
+        if (!this.data.plans.some((p) => p.id === defPlan.id)) {
+          this.data.plans.push({
+            ...defPlan,
+            created_at: now,
+            updated_at: now,
+          });
+        }
+      }
+    }
+
+    // 2. Garantir usuário Administrador Geral (preserva o atual se já existir)
+    const existingAdmin = this.data.users.find((u) => u.role === 'admin' && u.email.toLowerCase() === 'ale11062@gmail.com');
+    if (!existingAdmin) {
+      const adminPass = hashPassword(process.env.ADMIN_INITIAL_PASSWORD || 'Admin@123456');
+      this.data.users.unshift({
+        id: 'usr-admin-1',
+        name: 'Administrador Geral',
+        email: 'ale11062@gmail.com',
+        password_hash: adminPass.hash,
+        salt: adminPass.salt,
+        role: 'admin',
+        company_id: null,
+        active: true,
+        must_change_password: false,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
+    // 3. Remover registros demo antigos para recriação limpa sem conflitos
+    const demoCompanyIds = ['comp-demo-1', 'comp-demo-2'];
+    const demoUserEmails = [
+      'empresa@drogariasp.com.br',
+      'contato@drogariasp.com.br',
+      'operador@drogariasp.com.br',
+      'player1@drogariasp.com.br',
+      'player2@drogariasp.com.br',
+      'empresa@supermercado.com.br',
+      'contato@supermercado.com.br',
+      'operador@supermercado.com.br',
+      'player@supermercado.com.br',
+    ];
+
+    this.data.companies = this.data.companies.filter((c) => !demoCompanyIds.includes(c.id));
+    this.data.users = this.data.users.filter(
+      (u) => !demoCompanyIds.includes(u.company_id || '') && !demoUserEmails.includes(u.email.toLowerCase())
+    );
+    this.data.operators = this.data.operators.filter((o) => !demoCompanyIds.includes(o.company_id));
+    this.data.players = this.data.players.filter((p) => !demoCompanyIds.includes(p.company_id));
+    this.data.playlists = this.data.playlists.filter((pl) => !demoCompanyIds.includes(pl.company_id));
+    this.data.media = this.data.media.filter((m) => !demoCompanyIds.includes(m.company_id));
+    this.data.rss_feeds = this.data.rss_feeds.filter((r) => !demoCompanyIds.includes(r.company_id));
+    this.data.call_phrases = (this.data.call_phrases || []).filter((cp) => !demoCompanyIds.includes(cp.company_id));
+    this.data.sub_clients = (this.data.sub_clients || []).filter((sc) => !demoCompanyIds.includes(sc.company_id));
+
+    // =========================================================================
+    // CLIENTE 1: DROGARIA SÃO PAULO (FARMÁCIA & SAÚDE)
+    // =========================================================================
+    const comp1Id = 'comp-demo-1';
+    const comp1: Company = {
+      id: comp1Id,
+      legal_name: 'Drogaria São Paulo S/A',
+      trade_name: 'Drogaria São Paulo - Matriz',
+      cnpj: '61.412.110/0001-55',
+      email: 'contato@drogariasp.com.br',
+      phone: '(11) 3345-8000',
+      responsible: 'Roberto Ferreira',
+      address: 'Av. Paulista, 1000 - Bela Vista',
+      city: 'São Paulo',
+      state: 'SP',
+      plan_id: 'plan-call-inter',
+      start_date: '2026-01-01',
+      due_date: '2027-01-01',
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp1User: User = {
+      id: 'usr-comp-1',
+      name: 'Gerente Drogaria São Paulo',
+      email: 'empresa@drogariasp.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'company',
+      company_id: comp1Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const op1User: User = {
+      id: 'usr-op-1',
+      name: 'Carlos Atendimento',
+      email: 'operador@drogariasp.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'operator',
+      company_id: comp1Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const op1: Operator = {
+      id: 'op-1',
+      company_id: comp1Id,
+      user_id: op1User.id,
+      name: 'Carlos Atendimento - Balcão 01',
+      email: 'operador@drogariasp.com.br',
+      phone: '(11) 98765-4321',
+      active: true,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const play1User: User = {
+      id: 'usr-play-1',
+      name: 'Player Recepção',
+      email: 'player1@drogariasp.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'player',
+      company_id: comp1Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const play2User: User = {
+      id: 'usr-play-2',
+      name: 'Player Caixa 02',
+      email: 'player2@drogariasp.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'player',
+      company_id: comp1Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp1Media: Media[] = [
+      {
+        id: 'med-1',
+        company_id: comp1Id,
+        name: 'Ofertas da Semana - Até 40% OFF',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%230f172a"/><stop offset="100%" stop-color="%231e3a8a"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bg)"/><circle cx="1600" cy="250" r="380" fill="%232563eb" opacity="0.15"/><circle cx="200" cy="900" r="300" fill="%2338bdf8" opacity="0.1"/><rect x="120" y="100" width="280" height="52" rx="10" fill="%232563eb"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">DROGARIA SÃO PAULO</text><text x="120" y="320" fill="%2338bdf8" font-size="38" font-family="system-ui, sans-serif" font-weight="bold" letter-spacing="4">SEMANA DA SAÚDE E BEM-ESTAR</text><text x="120" y="440" fill="%23ffffff" font-size="82" font-family="system-ui, sans-serif" font-weight="900">ATÉ 40% DE DESCONTO</text><text x="120" y="540" fill="%2394a3b8" font-size="34" font-family="system-ui, sans-serif">Em medicamentos selecionados, dermocosméticos e vitaminas.</text><rect x="120" y="640" width="600" height="180" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="160" y="710" fill="%2338bdf8" font-size="26" font-family="system-ui, sans-serif" font-weight="bold">CONSULTE NOSSO FARMACÊUTICO</text><text x="160" y="760" fill="%23cbd5e1" font-size="22" font-family="system-ui, sans-serif">Aferição de pressão e testes rápidos no guichê 01.</text></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-2',
+        company_id: comp1Id,
+        name: 'Horário de Atendimento e Delivery',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23091e3a"/><stop offset="100%" stop-color="%230f172a"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bg2)"/><rect x="120" y="100" width="260" height="52" rx="10" fill="%2310b981"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">ATENDIMENTO 24 HORAS</text><text x="120" y="320" fill="%2334d399" font-size="38" font-family="system-ui, sans-serif" font-weight="bold">COMODIDADE PARA VOCÊ</text><text x="120" y="440" fill="%23ffffff" font-size="78" font-family="system-ui, sans-serif" font-weight="900">RECEBA MEDICAMENTOS EM CASA</text><text x="120" y="540" fill="%2394a3b8" font-size="34" font-family="system-ui, sans-serif">Peça pelo WhatsApp oficial com entrega expressa em até 45 minutos.</text><g transform="translate(120, 650)"><rect width="450" height="140" rx="14" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="40" y="60" fill="%2338bdf8" font-size="22" font-family="system-ui, sans-serif">WHATSAPP OFICIAL</text><text x="40" y="105" fill="%23ffffff" font-size="32" font-family="system-ui, sans-serif" font-weight="bold">(11) 98765-0000</text></g></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-3',
+        company_id: comp1Id,
+        name: 'Dica de Saúde - Hidratação Diária',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23172554"/><stop offset="100%" stop-color="%231e293b"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bg3)"/><rect x="120" y="100" width="200" height="52" rx="10" fill="%230284c7"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">DICA DE SAÚDE</text><text x="120" y="320" fill="%2338bdf8" font-size="36" font-family="system-ui, sans-serif" font-weight="bold">CUIDE DO SEU CORPO</text><text x="120" y="440" fill="%23ffffff" font-size="80" font-family="system-ui, sans-serif" font-weight="900">VOCÊ JÁ BEBEU ÁGUA HOJE?</text><text x="120" y="540" fill="%2394a3b8" font-size="34" font-family="system-ui, sans-serif">A hidratação regular melhora a disposição, circulação e o funcionamento renal.</text><rect x="120" y="650" width="700" height="140" rx="14" fill="%230f172a" stroke="%23334155" stroke-width="2"/><text x="160" y="715" fill="%2338bdf8" font-size="24" font-family="system-ui, sans-serif" font-weight="bold">RECOMENDAÇÃO MÉDICA</text><text x="160" y="755" fill="%23e2e8f0" font-size="20" font-family="system-ui, sans-serif">Consuma no mínimo 2 litros de água filtrada ao longo do dia.</text></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-weather-clock',
+        company_id: comp1Id,
+        name: 'Hora Certa & Previsão do Tempo',
+        type: 'weather_clock',
+        file_url: 'widget:weather_clock',
+        duration: 12,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-rss-saude',
+        company_id: comp1Id,
+        name: 'Notícias RSS - Saúde & Bem-Estar',
+        type: 'rss',
+        file_url: 'https://g1.globo.com/rss/g1/saude/',
+        duration: 15,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+
+    const pl1Id = 'pl-1';
+    const pl1: Playlist = {
+      id: pl1Id,
+      company_id: comp1Id,
+      name: 'Programação Recepção Geral',
+      description: 'Loop institucional com promoções, dicas de saúde, clima/hora e notícias em tempo real.',
+      weather_city: 'São Paulo',
+      active: true,
+      items: [
+        { id: 'pli-1', playlist_id: pl1Id, media_id: 'med-1', position: 1, duration: 8, created_at: now },
+        { id: 'pli-2', playlist_id: pl1Id, media_id: 'med-2', position: 2, duration: 8, created_at: now },
+        { id: 'pli-3', playlist_id: pl1Id, media_id: 'med-3', position: 3, duration: 8, created_at: now },
+        { id: 'pli-4', playlist_id: pl1Id, media_id: 'med-weather-clock', position: 4, duration: 12, created_at: now },
+        { id: 'pli-5', playlist_id: pl1Id, media_id: 'med-rss-saude', position: 5, duration: 15, created_at: now },
+      ],
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp1Players: Player[] = [
+      {
+        id: 'play-1',
+        company_id: comp1Id,
+        user_id: play1User.id,
+        name: 'PLAYER RECEPÇÃO',
+        code: 'PLAY-REC-01',
+        location: 'Hall de Entrada Principal',
+        description: 'Smart TV 55 polegadas na recepção principal.',
+        orientation: 'horizontal',
+        playlist_id: pl1Id,
+        status: 'active',
+        access_token: 'tok_play_rec_01_a9f8b2c4',
+        last_seen: new Date().toISOString(),
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'play-2',
+        company_id: comp1Id,
+        user_id: play2User.id,
+        name: 'PLAYER SALA 02 (TOTEM)',
+        code: 'PLAY-SALA-02',
+        location: 'Sala de Espera 02',
+        description: 'Totem digital vertical 9:16 na sala de espera.',
+        orientation: 'vertical',
+        playlist_id: pl1Id,
+        status: 'active',
+        access_token: 'tok_play_sala_02_e7d1c3b5',
+        last_seen: new Date(Date.now() - 3600000).toISOString(),
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+
+    const comp1Phrases: CallPhrase[] = [
+      { id: 'ph-1', company_id: comp1Id, operator_id: null, phrase: 'Senha normal no Balcão 01', active: true, created_at: now, updated_at: now },
+      { id: 'ph-2', company_id: comp1Id, operator_id: null, phrase: 'Atendimento preferencial no Caixa 02', active: true, created_at: now, updated_at: now },
+      { id: 'ph-3', company_id: comp1Id, operator_id: null, phrase: 'Retirada de medicamentos no Guichê 03', active: true, created_at: now, updated_at: now },
+    ];
+
+    const comp1Rss: RssFeed[] = DEFAULT_RSS_FEEDS.map((feed, idx) => ({
+      id: `rss-comp1-${idx + 1}`,
+      company_id: comp1Id,
+      name: feed.name,
+      url: feed.url,
+      active: true,
+      created_at: now,
+      updated_at: now,
+    }));
+
+    // =========================================================================
+    // CLIENTE 2: SUPERMERCADO CENTRAL HORTIFRUTI (VAREJO & ALIMENTOS)
+    // =========================================================================
+    const comp2Id = 'comp-demo-2';
+    const comp2: Company = {
+      id: comp2Id,
+      legal_name: 'Supermercado Central Alimentos Ltda',
+      trade_name: 'Supermercado Central Hortifruti',
+      cnpj: '72.523.220/0001-66',
+      email: 'contato@supermercado.com.br',
+      phone: '(11) 3456-7890',
+      responsible: 'Mariana Souza',
+      address: 'Rua das Flores, 500 - Centro',
+      city: 'Campinas',
+      state: 'SP',
+      plan_id: 'plan-call-inter',
+      start_date: '2026-01-01',
+      due_date: '2027-01-01',
+      status: 'active',
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp2User: User = {
+      id: 'usr-comp-2',
+      name: 'Gerente Supermercado Central',
+      email: 'empresa@supermercado.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'company',
+      company_id: comp2Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const op2User: User = {
+      id: 'usr-op-2',
+      name: 'Ana Operadora',
+      email: 'operador@supermercado.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'operator',
+      company_id: comp2Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const op2: Operator = {
+      id: 'op-2',
+      company_id: comp2Id,
+      user_id: op2User.id,
+      name: 'Ana Operadora - Caixa 01',
+      email: 'operador@supermercado.com.br',
+      phone: '(11) 97654-3210',
+      active: true,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const play3User: User = {
+      id: 'usr-play-3',
+      name: 'Player Hortifruti',
+      email: 'player@supermercado.com.br',
+      password_hash: demoPass.hash,
+      salt: demoPass.salt,
+      role: 'player',
+      company_id: comp2Id,
+      active: true,
+      must_change_password: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp2Media: Media[] = [
+      {
+        id: 'med-merc-1',
+        company_id: comp2Id,
+        name: 'Festival de Hortifruti Fresco - Até 35% OFF',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bgm1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23064e3b"/><stop offset="100%" stop-color="%23022c22"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bgm1)"/><circle cx="1600" cy="300" r="350" fill="%2310b981" opacity="0.15"/><rect x="120" y="100" width="340" height="52" rx="10" fill="%23059669"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">SUPERMERCADO CENTRAL</text><text x="120" y="320" fill="%2334d399" font-size="38" font-family="system-ui, sans-serif" font-weight="bold" letter-spacing="4">DIRETO DO PRODUTOR PARA SUA MESA</text><text x="120" y="440" fill="%23ffffff" font-size="82" font-family="system-ui, sans-serif" font-weight="900">FESTIVAL DE HORTIFRUTI</text><text x="120" y="540" fill="%23a7f3d0" font-size="34" font-family="system-ui, sans-serif">Frutas, verduras e legumes selecionados com até 35% de desconto hoje.</text><rect x="120" y="640" width="620" height="180" rx="16" fill="%23065f46" stroke="%2310b981" stroke-width="2"/><text x="160" y="710" fill="%236ee7b7" font-size="26" font-family="system-ui, sans-serif" font-weight="bold">QUALIDADE E FRESCOR GARANTIDOS</text><text x="160" y="760" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif">Reposição diária às 06h e 14h com procedência sustentável.</text></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-merc-2',
+        company_id: comp2Id,
+        name: 'Padaria & Confeitaria Artesanal',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bgm2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23451a03"/><stop offset="100%" stop-color="%231c1917"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bgm2)"/><rect x="120" y="100" width="280" height="52" rx="10" fill="%23d97706"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">PADARIA ARTESANAL</text><text x="120" y="320" fill="%23fbbf24" font-size="38" font-family="system-ui, sans-serif" font-weight="bold">PÃO QUENTINHO A TODA HORA</text><text x="120" y="440" fill="%23ffffff" font-size="78" font-family="system-ui, sans-serif" font-weight="900">FORNADAS A CADA 30 MINUTOS</text><text x="120" y="540" fill="%23fed7aa" font-size="34" font-family="system-ui, sans-serif">Pães franceses crocantes, bolos caseiros, salgados e cafés especiais.</text><g transform="translate(120, 650)"><rect width="520" height="140" rx="14" fill="%23292524" stroke="%2378350f" stroke-width="2"/><text x="40" y="60" fill="%23f59e0b" font-size="22" font-family="system-ui, sans-serif">COMBO CAFÉ DA MANHÃ</text><text x="40" y="105" fill="%23ffffff" font-size="30" font-family="system-ui, sans-serif" font-weight="bold">Pão na Chapa + Café Expresso R$ 6,90</text></g></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-merc-3',
+        company_id: comp2Id,
+        name: 'Clube de Vantagens Super Central',
+        type: 'image',
+        file_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080"><defs><linearGradient id="bgm3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%231e1b4b"/><stop offset="100%" stop-color="%230f172a"/></linearGradient></defs><rect width="1920" height="1080" fill="url(%23bgm3)"/><rect x="120" y="100" width="280" height="52" rx="10" fill="%234f46e5"/><text x="140" y="134" fill="%23ffffff" font-size="22" font-family="system-ui, sans-serif" font-weight="bold">CLUBE DE DESCONTOS</text><text x="120" y="320" fill="%23818cf8" font-size="36" font-family="system-ui, sans-serif" font-weight="bold">ECONOMIA REAL NO SEU DIA</text><text x="120" y="440" fill="%23ffffff" font-size="80" font-family="system-ui, sans-serif" font-weight="900">INFORME SEU CPF NO CAIXA</text><text x="120" y="540" fill="%23c7d2fe" font-size="34" font-family="system-ui, sans-serif">Ative ofertas instantâneas pelo aplicativo e acumule pontos para trocar por prêmios.</text><rect x="120" y="650" width="650" height="140" rx="14" fill="%231e293b" stroke="%234338ca" stroke-width="2"/><text x="160" y="715" fill="%23a5b4fc" font-size="24" font-family="system-ui, sans-serif" font-weight="bold">BAIXE O APLICATIVO GRATUITO</text><text x="160" y="755" fill="%23ffffff" font-size="20" font-family="system-ui, sans-serif">Disponível para Android e iOS na Google Play e App Store.</text></svg>',
+        duration: 8,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-weather-clock-2',
+        company_id: comp2Id,
+        name: 'Hora Certa & Previsão do Tempo',
+        type: 'weather_clock',
+        file_url: 'widget:weather_clock',
+        duration: 12,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'med-rss-merc',
+        company_id: comp2Id,
+        name: 'Notícias RSS - Economia & Brasil',
+        type: 'rss',
+        file_url: 'https://g1.globo.com/rss/g1/economia/',
+        duration: 15,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+
+    const pl2Id = 'pl-2';
+    const pl2: Playlist = {
+      id: pl2Id,
+      company_id: comp2Id,
+      name: 'Programação TV Central Hortifruti',
+      description: 'Loop do salão de vendas com ofertas de hortifruti, padaria, clube de vantagens, clima e notícias.',
+      weather_city: 'Campinas',
+      active: true,
+      items: [
+        { id: 'pli-merc-1', playlist_id: pl2Id, media_id: 'med-merc-1', position: 1, duration: 8, created_at: now },
+        { id: 'pli-merc-2', playlist_id: pl2Id, media_id: 'med-merc-2', position: 2, duration: 8, created_at: now },
+        { id: 'pli-merc-3', playlist_id: pl2Id, media_id: 'med-merc-3', position: 3, duration: 8, created_at: now },
+        { id: 'pli-merc-4', playlist_id: pl2Id, media_id: 'med-weather-clock-2', position: 4, duration: 12, created_at: now },
+        { id: 'pli-merc-5', playlist_id: pl2Id, media_id: 'med-rss-merc', position: 5, duration: 15, created_at: now },
+      ],
+      created_at: now,
+      updated_at: now,
+    };
+
+    const comp2Players: Player[] = [
+      {
+        id: 'play-3',
+        company_id: comp2Id,
+        user_id: play3User.id,
+        name: 'TV VENDAS / HORTIFRUTI',
+        code: 'PLAY-MERC-02',
+        location: 'Salão Central de Vendas',
+        description: 'Smart TV 65 polegadas voltada para o corredor principal e caixas.',
+        orientation: 'horizontal',
+        playlist_id: pl2Id,
+        status: 'active',
+        access_token: 'tok_play_merc_02_c1d2e3f4',
+        last_seen: new Date().toISOString(),
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+
+    const comp2Phrases: CallPhrase[] = [
+      { id: 'ph-merc-1', company_id: comp2Id, operator_id: null, phrase: 'Próximo cliente ao Caixa Rápido 01', active: true, created_at: now, updated_at: now },
+      { id: 'ph-merc-2', company_id: comp2Id, operator_id: null, phrase: 'Atendimento preferencial no Caixa 02', active: true, created_at: now, updated_at: now },
+      { id: 'ph-merc-3', company_id: comp2Id, operator_id: null, phrase: 'Retirada de compras online no Balcão Central', active: true, created_at: now, updated_at: now },
+    ];
+
+    const comp2Rss: RssFeed[] = DEFAULT_RSS_FEEDS.map((feed, idx) => ({
+      id: `rss-comp2-${idx + 1}`,
+      company_id: comp2Id,
+      name: feed.name,
+      url: feed.url,
+      active: true,
+      created_at: now,
+      updated_at: now,
+    }));
+
+    // Inserir os registros nas coleções
+    this.data.companies.push(comp1, comp2);
+    this.data.users.push(comp1User, op1User, play1User, play2User, comp2User, op2User, play3User);
+    this.data.operators.push(op1, op2);
+    this.data.players.push(...comp1Players, ...comp2Players);
+    this.data.playlists.push(pl1, pl2);
+    this.data.media.push(...comp1Media, ...comp2Media);
+    this.data.rss_feeds.push(...comp1Rss, ...comp2Rss);
+    this.data.call_phrases.push(...comp1Phrases, ...comp2Phrases);
+
+    // Sub-clientes de demonstração
+    this.data.sub_clients.push(
+      {
+        id: 'sub-cli-1',
+        company_id: comp1Id,
+        name: 'Dr. Roberto Rocha (Consultório 02)',
+        code: 'CLI-001',
+        phone: '(11) 98111-2233',
+        email: 'roberto@clinicaexemplo.com.br',
+        notes: 'Cliente atendido para serviços de saúde.',
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'sub-cli-2',
+        company_id: comp1Id,
+        name: 'Farmácia Central Distribuidora',
+        code: 'CLI-002',
+        phone: '(11) 98222-3344',
+        email: 'central@farmaciaexemplo.com.br',
+        notes: 'Cliente comercial para orçamentos de mídias.',
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: 'sub-cli-3',
+        company_id: comp2Id,
+        name: 'Restaurante Sabor da Terra',
+        code: 'CLI-M01',
+        phone: '(11) 98333-4455',
+        email: 'contato@restaurantesabor.com.br',
+        notes: 'Parceiro comercial para exibição de anúncios na TV.',
+        created_at: now,
+        updated_at: now,
+      }
+    );
+
+    this.save();
+
+    return {
+      message: 'Dados de teste carregados com sucesso! 2 empresas clientes, 2 operadores e 3 telas ativas prontas para exibição.',
+      companiesCount: 2,
+      operatorsCount: 2,
+      playersCount: 3,
+      demoClients: [
+        {
+          id: comp1Id,
+          name: comp1.trade_name,
+          segment: 'Farmácia & Saúde',
+          companyEmail: 'empresa@drogariasp.com.br',
+          operatorEmail: 'operador@drogariasp.com.br',
+          playerCode: 'PLAY-REC-01',
+          playerCodeSecondary: 'PLAY-SALA-02',
+        },
+        {
+          id: comp2Id,
+          name: comp2.trade_name,
+          segment: 'Varejo & Hortifruti',
+          companyEmail: 'empresa@supermercado.com.br',
+          operatorEmail: 'operador@supermercado.com.br',
+          playerCode: 'PLAY-MERC-02',
+        },
+      ],
+    };
+  }
 }
 
 export const db = new DatabaseStore();

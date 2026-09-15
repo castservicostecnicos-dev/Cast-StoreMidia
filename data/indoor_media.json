@@ -14,58 +14,6 @@
       "updated_at": "2026-09-03T11:03:00.000Z"
     },
     {
-      "id": "usr-comp-1",
-      "name": "Gerente Drogaria São Paulo",
-      "email": "empresa@drogariasp.com.br",
-      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
-      "salt": "6ced59bb1e78cf9f527c73152513ec28",
-      "role": "company",
-      "company_id": "comp-demo-1",
-      "active": true,
-      "must_change_password": false,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "usr-op-1",
-      "name": "Carlos Atendimento",
-      "email": "operador@drogariasp.com.br",
-      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
-      "salt": "6ced59bb1e78cf9f527c73152513ec28",
-      "role": "operator",
-      "company_id": "comp-demo-1",
-      "active": true,
-      "must_change_password": false,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "usr-play-1",
-      "name": "Player Recepção",
-      "email": "player1@drogariasp.com.br",
-      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
-      "salt": "6ced59bb1e78cf9f527c73152513ec28",
-      "role": "player",
-      "company_id": "comp-demo-1",
-      "active": true,
-      "must_change_password": false,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "usr-play-2",
-      "name": "Player Caixa 02",
-      "email": "player2@drogariasp.com.br",
-      "password_hash": "d7e516ae461c0085762f5b51a028e98ef3abfd08d1336c818518339d53e1a31c40f03acfe98470bb00172412c72227e3977063a92a4b7a908d89af479f3629ae",
-      "salt": "6ced59bb1e78cf9f527c73152513ec28",
-      "role": "player",
-      "company_id": "comp-demo-1",
-      "active": true,
-      "must_change_password": false,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
       "id": "usr-1789448094259",
       "name": "Carlos",
       "email": "teste@empresa.com",
@@ -103,27 +51,152 @@
       "must_change_password": false,
       "created_at": "2026-09-15T04:57:02.589Z",
       "updated_at": "2026-09-15T04:57:02.589Z"
+    },
+    {
+      "id": "usr-comp-1",
+      "name": "Gerente Drogaria São Paulo",
+      "email": "empresa@drogariasp.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "company",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-op-1",
+      "name": "Carlos Atendimento",
+      "email": "operador@drogariasp.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "operator",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-play-1",
+      "name": "Player Recepção",
+      "email": "player1@drogariasp.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "player",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-play-2",
+      "name": "Player Caixa 02",
+      "email": "player2@drogariasp.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "player",
+      "company_id": "comp-demo-1",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-comp-2",
+      "name": "Gerente Supermercado Central",
+      "email": "empresa@supermercado.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "company",
+      "company_id": "comp-demo-2",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-op-2",
+      "name": "Ana Operadora",
+      "email": "operador@supermercado.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "operator",
+      "company_id": "comp-demo-2",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-play-3",
+      "name": "Player Hortifruti",
+      "email": "player@supermercado.com.br",
+      "password_hash": "cc2072db9381b2a929717e39fe27268a5509a61364448bf82aea8576e20a0992020ab81314c4344a89a92c44d2c82ea820955a410b5c08a54734b5ac935c292d",
+      "salt": "c9f573639d37d679f7a8e5ab605c4eb9",
+      "role": "player",
+      "company_id": "comp-demo-2",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "usr-1789474587550",
+      "name": "Carlos Silva",
+      "email": "contato@fitlife.com.br",
+      "password_hash": "2c66195396eded78a2b58a77d291ad2395b15c65e5cf2279db231b8b4c53bc3620fac394411e39182f5dbbb4f90e5b1336f4d862124f9ccbf5cccd3b432ec519",
+      "salt": "4688c8ed9857f62f7d472d017e5d5fb0",
+      "role": "company",
+      "company_id": "comp-1789474587508",
+      "active": true,
+      "must_change_password": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "usr-1789474599541",
+      "name": "Restaurante Sabores",
+      "email": "admin@sabores.com",
+      "password_hash": "64f783272c54df4d5fbc186ba6344a734c7a15e5830e8bed4d68c58269e5e768b27d50d31e5544df240a57d1c277b198c170aba9c05f543538b53326e7069ae5",
+      "salt": "aaec755d38f15f31fa0be8c125c48711",
+      "role": "company",
+      "company_id": "comp-1789474599478",
+      "active": true,
+      "must_change_password": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "usr-play-1789474603209",
+      "name": "TV Recepção 1",
+      "email": "player_1789474603164@indoor.local",
+      "password_hash": "b33dfc903f600ec92d10c9e471658e66dd57495701553816558155bd31d5d76e9c28b1dfc671fe98c76abfba74639b45a973edab4b299734496993cf506a37e8",
+      "salt": "57090da9a325bf233d9665fbdcc6f576",
+      "role": "player",
+      "company_id": "comp-1789474599478",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:16:43.163Z",
+      "updated_at": "2026-09-15T12:16:43.163Z"
+    },
+    {
+      "id": "usr-op-1789474604776",
+      "name": "Operador Caixa 1",
+      "email": "caixa1@sabores.com",
+      "password_hash": "3cf6b6583a97464e5378a59569290873ea69f2e7556e09a00bba6a8d26b353d5e5b0bd1a761345adf3d291af265d5ada13cbd0224357f39f1c73655bafe89ec2",
+      "salt": "bb7e38ae374616fdf1650c75aaf50ea5",
+      "role": "operator",
+      "company_id": "comp-1789474599478",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T12:16:44.733Z",
+      "updated_at": "2026-09-15T12:16:44.733Z"
     }
   ],
   "companies": [
-    {
-      "id": "comp-demo-1",
-      "legal_name": "Drogaria São Paulo S/A",
-      "trade_name": "Drogaria São Paulo - Matriz",
-      "cnpj": "61.412.110/0001-55",
-      "email": "contato@drogariasp.com.br",
-      "phone": "(11) 3345-8000",
-      "responsible": "Roberto Ferreira",
-      "address": "Av. Paulista, 1000",
-      "city": "São Paulo",
-      "state": "SP",
-      "plan_id": "plan-call-inter",
-      "start_date": "2026-01-01",
-      "due_date": "2027-01-01",
-      "status": "active",
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
     {
       "id": "comp-1789448094196",
       "legal_name": "Empresa Teste Ltda",
@@ -141,6 +214,78 @@
       "status": "active",
       "created_at": "2026-09-15T04:54:54.196Z",
       "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "comp-demo-1",
+      "legal_name": "Drogaria São Paulo S/A",
+      "trade_name": "Drogaria São Paulo - Matriz",
+      "cnpj": "61.412.110/0001-55",
+      "email": "contato@drogariasp.com.br",
+      "phone": "(11) 3345-8000",
+      "responsible": "Roberto Ferreira",
+      "address": "Av. Paulista, 1000 - Bela Vista",
+      "city": "São Paulo",
+      "state": "SP",
+      "plan_id": "plan-call-inter",
+      "start_date": "2026-01-01",
+      "due_date": "2027-01-01",
+      "status": "active",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "comp-demo-2",
+      "legal_name": "Supermercado Central Alimentos Ltda",
+      "trade_name": "Supermercado Central Hortifruti",
+      "cnpj": "72.523.220/0001-66",
+      "email": "contato@supermercado.com.br",
+      "phone": "(11) 3456-7890",
+      "responsible": "Mariana Souza",
+      "address": "Rua das Flores, 500 - Centro",
+      "city": "Campinas",
+      "state": "SP",
+      "plan_id": "plan-call-inter",
+      "start_date": "2026-01-01",
+      "due_date": "2027-01-01",
+      "status": "active",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "comp-1789474587508",
+      "legal_name": "Academia FitLife Ltda",
+      "trade_name": "Academia FitLife",
+      "cnpj": "11.222.333/0001-44",
+      "email": "contato@fitlife.com.br",
+      "phone": "(11) 98888-7777",
+      "responsible": "Carlos Silva",
+      "address": "",
+      "city": "Campinas",
+      "state": "SP",
+      "plan_id": "plan-call-basic",
+      "start_date": "2026-09-15",
+      "due_date": "",
+      "status": "active",
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "comp-1789474599478",
+      "legal_name": "Restaurante Sabores",
+      "trade_name": "Restaurante Sabores",
+      "cnpj": "00.000.000/0001-00",
+      "email": "admin@sabores.com",
+      "phone": "",
+      "responsible": "",
+      "address": "",
+      "city": "",
+      "state": "",
+      "plan_id": "plan-call-basic",
+      "start_date": "2026-09-15",
+      "due_date": "",
+      "status": "active",
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
     }
   ],
   "plans": [
@@ -227,41 +372,33 @@
       "active": true,
       "created_at": "2026-09-15T04:56:48.335Z",
       "updated_at": "2026-09-15T04:56:48.335Z"
+    },
+    {
+      "id": "plan-1789470649137",
+      "name": "Call Especial",
+      "description": "1 tela com chamadas no painel e até 4 operadores de atendimento (proporção 4:1).",
+      "max_players": 5,
+      "max_operators": 20,
+      "max_storage": 200,
+      "monthly_price": 49,
+      "active": true,
+      "created_at": "2026-09-15T11:10:49.137Z",
+      "updated_at": "2026-09-15T11:10:49.137Z"
+    },
+    {
+      "id": "plan-1789474617723",
+      "name": "Plano Corporativo Prime",
+      "description": "10 telas e 40 operadores",
+      "max_players": 10,
+      "max_operators": 40,
+      "max_storage": 200,
+      "monthly_price": 299,
+      "active": true,
+      "created_at": "2026-09-15T12:16:57.723Z",
+      "updated_at": "2026-09-15T12:16:57.723Z"
     }
   ],
   "players": [
-    {
-      "id": "play-1",
-      "company_id": "comp-demo-1",
-      "user_id": "usr-play-1",
-      "name": "PLAYER RECEPÇÃO",
-      "code": "PLAY-REC-01",
-      "location": "Hall de Entrada Principal",
-      "description": "Smart TV 55 polegadas na recepção principal.",
-      "orientation": "horizontal",
-      "playlist_id": "pl-1",
-      "status": "active",
-      "last_seen": "2026-09-03T11:43:03.408Z",
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z",
-      "access_token": "tok_a94aae0b4430e3b26406088028a31e89"
-    },
-    {
-      "id": "play-2",
-      "company_id": "comp-demo-1",
-      "user_id": "usr-play-2",
-      "name": "PLAYER SALA 02 (TOTEM)",
-      "code": "PLAY-SALA-02",
-      "location": "Sala de Espera 02",
-      "description": "Totem digital vertical 9:16 na sala de espera.",
-      "orientation": "vertical",
-      "playlist_id": "pl-vert-1",
-      "status": "active",
-      "last_seen": "2026-09-03T10:29:04.697Z",
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z",
-      "access_token": "tok_df9ade9b4744c56d0c5171381010bf55"
-    },
     {
       "id": "play-1789448218666",
       "company_id": "comp-1789448094196",
@@ -277,20 +414,73 @@
       "last_seen": "1970-01-01T00:00:00.000Z",
       "created_at": "2026-09-15T04:56:58.623Z",
       "updated_at": "2026-09-15T04:56:58.623Z"
+    },
+    {
+      "id": "play-1",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-play-1",
+      "name": "PLAYER RECEPÇÃO",
+      "code": "PLAY-REC-01",
+      "location": "Hall de Entrada Principal",
+      "description": "Smart TV 55 polegadas na recepção principal.",
+      "orientation": "horizontal",
+      "playlist_id": "pl-1",
+      "status": "active",
+      "access_token": "tok_play_rec_01_a9f8b2c4",
+      "last_seen": "2026-09-15T12:14:59.419Z",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "play-2",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-play-2",
+      "name": "PLAYER SALA 02 (TOTEM)",
+      "code": "PLAY-SALA-02",
+      "location": "Sala de Espera 02",
+      "description": "Totem digital vertical 9:16 na sala de espera.",
+      "orientation": "vertical",
+      "playlist_id": "pl-1",
+      "status": "active",
+      "access_token": "tok_play_sala_02_e7d1c3b5",
+      "last_seen": "2026-09-15T11:14:59.419Z",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "play-3",
+      "company_id": "comp-demo-2",
+      "user_id": "usr-play-3",
+      "name": "TV VENDAS / HORTIFRUTI",
+      "code": "PLAY-MERC-02",
+      "location": "Salão Central de Vendas",
+      "description": "Smart TV 65 polegadas voltada para o corredor principal e caixas.",
+      "orientation": "horizontal",
+      "playlist_id": "pl-2",
+      "status": "active",
+      "access_token": "tok_play_merc_02_c1d2e3f4",
+      "last_seen": "2026-09-15T12:14:59.420Z",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "play-1789474603209",
+      "company_id": "comp-1789474599478",
+      "user_id": "usr-play-1789474603209",
+      "name": "TV Recepção 1",
+      "code": "SAB-01",
+      "location": "Entrada Principal",
+      "description": "",
+      "orientation": "horizontal",
+      "playlist_id": null,
+      "status": "active",
+      "access_token": "tok_f1db032e2b9f138e3b4e480878a4a112",
+      "last_seen": "1970-01-01T00:00:00.000Z",
+      "created_at": "2026-09-15T12:16:43.163Z",
+      "updated_at": "2026-09-15T12:16:43.163Z"
     }
   ],
   "operators": [
-    {
-      "id": "op-1",
-      "company_id": "comp-demo-1",
-      "user_id": "usr-op-1",
-      "name": "Carlos Atendimento",
-      "email": "operador@drogariasp.com.br",
-      "phone": "(11) 98765-4321",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
     {
       "id": "op-1789448222632",
       "company_id": "comp-1789448094196",
@@ -301,87 +491,42 @@
       "active": true,
       "created_at": "2026-09-15T04:57:02.589Z",
       "updated_at": "2026-09-15T04:57:02.589Z"
+    },
+    {
+      "id": "op-1",
+      "company_id": "comp-demo-1",
+      "user_id": "usr-op-1",
+      "name": "Carlos Atendimento - Balcão 01",
+      "email": "operador@drogariasp.com.br",
+      "phone": "(11) 98765-4321",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "op-2",
+      "company_id": "comp-demo-2",
+      "user_id": "usr-op-2",
+      "name": "Ana Operadora - Caixa 01",
+      "email": "operador@supermercado.com.br",
+      "phone": "(11) 97654-3210",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "op-1789474604776",
+      "company_id": "comp-1789474599478",
+      "user_id": "usr-op-1789474604776",
+      "name": "Operador Caixa 1",
+      "email": "caixa1@sabores.com",
+      "phone": "(11) 98888-1111",
+      "active": true,
+      "created_at": "2026-09-15T12:16:44.733Z",
+      "updated_at": "2026-09-15T12:16:44.733Z"
     }
   ],
   "playlists": [
-    {
-      "id": "pl-1",
-      "company_id": "comp-demo-1",
-      "name": "Programação Recepção Geral",
-      "description": "Loop institucional com promoções e dicas de saúde.",
-      "active": true,
-      "items": [
-        {
-          "id": "pli-1",
-          "playlist_id": "pl-1",
-          "media_id": "med-1",
-          "position": 1,
-          "duration": 8,
-          "created_at": "2026-09-03T11:29:04.566Z"
-        },
-        {
-          "id": "pli-2",
-          "playlist_id": "pl-1",
-          "media_id": "med-2",
-          "position": 2,
-          "duration": 8,
-          "created_at": "2026-09-03T11:29:04.566Z"
-        },
-        {
-          "id": "pli-3",
-          "playlist_id": "pl-1",
-          "media_id": "med-3",
-          "position": 3,
-          "duration": 8,
-          "created_at": "2026-09-03T11:29:04.566Z"
-        },
-        {
-          "id": "pli-1789443049644-weather",
-          "playlist_id": "pl-1",
-          "media_id": "med-weather-clock",
-          "position": 4,
-          "duration": 12,
-          "created_at": "2026-09-15T03:30:49.643Z"
-        },
-        {
-          "id": "pli-1789443049644-rss",
-          "playlist_id": "pl-1",
-          "media_id": "med-1789443049644-rss-saude",
-          "position": 5,
-          "duration": 15,
-          "created_at": "2026-09-15T03:30:49.644Z"
-        }
-      ],
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "pl-vert-1",
-      "company_id": "comp-demo-1",
-      "name": "Programação Totem Vertical (9:16)",
-      "description": "Exibição otimizada para totens digitais e monitores verticais 1080x1920.",
-      "active": true,
-      "items": [
-        {
-          "id": "pli-v-1",
-          "playlist_id": "pl-vert-1",
-          "media_id": "med-vert-1",
-          "position": 1,
-          "duration": 8,
-          "created_at": "2026-09-03T11:29:04.566Z"
-        },
-        {
-          "id": "pli-v-2",
-          "playlist_id": "pl-vert-1",
-          "media_id": "med-vert-2",
-          "position": 2,
-          "duration": 8,
-          "created_at": "2026-09-03T11:29:04.566Z"
-        }
-      ],
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
     {
       "id": "pl-1789448094259",
       "company_id": "comp-1789448094196",
@@ -420,86 +565,189 @@
       "items": [],
       "created_at": "2026-09-15T04:57:05.723Z",
       "updated_at": "2026-09-15T04:57:05.723Z"
+    },
+    {
+      "id": "pl-1",
+      "company_id": "comp-demo-1",
+      "name": "Programação Recepção Geral",
+      "description": "Loop institucional com promoções, dicas de saúde, clima/hora e notícias em tempo real.",
+      "weather_city": "São Paulo",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1",
+          "playlist_id": "pl-1",
+          "media_id": "med-1",
+          "position": 1,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-2",
+          "playlist_id": "pl-1",
+          "media_id": "med-2",
+          "position": 2,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-3",
+          "playlist_id": "pl-1",
+          "media_id": "med-3",
+          "position": 3,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-4",
+          "playlist_id": "pl-1",
+          "media_id": "med-weather-clock",
+          "position": 4,
+          "duration": 12,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-5",
+          "playlist_id": "pl-1",
+          "media_id": "med-rss-saude",
+          "position": 5,
+          "duration": 15,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        }
+      ],
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "pl-2",
+      "company_id": "comp-demo-2",
+      "name": "Programação TV Central Hortifruti",
+      "description": "Loop do salão de vendas com ofertas de hortifruti, padaria, clube de vantagens, clima e notícias.",
+      "weather_city": "Campinas",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-merc-1",
+          "playlist_id": "pl-2",
+          "media_id": "med-merc-1",
+          "position": 1,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-merc-2",
+          "playlist_id": "pl-2",
+          "media_id": "med-merc-2",
+          "position": 2,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-merc-3",
+          "playlist_id": "pl-2",
+          "media_id": "med-merc-3",
+          "position": 3,
+          "duration": 8,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-merc-4",
+          "playlist_id": "pl-2",
+          "media_id": "med-weather-clock-2",
+          "position": 4,
+          "duration": 12,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        },
+        {
+          "id": "pli-merc-5",
+          "playlist_id": "pl-2",
+          "media_id": "med-rss-merc",
+          "position": 5,
+          "duration": 15,
+          "created_at": "2026-09-15T12:14:59.358Z"
+        }
+      ],
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "pl-1789474587551",
+      "company_id": "comp-1789474587508",
+      "name": "Programação Principal",
+      "description": "Programação inicial com notícias RSS em tempo real e previsão do tempo.",
+      "weather_city": "Campinas",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1789474587551-1",
+          "playlist_id": "pl-1789474587551",
+          "media_id": "med-1789474587551-weather",
+          "position": 1,
+          "duration": 12,
+          "created_at": "2026-09-15T12:16:27.508Z"
+        },
+        {
+          "id": "pli-1789474587551-2",
+          "playlist_id": "pl-1789474587551",
+          "media_id": "med-1789474587551-rss-saude",
+          "position": 2,
+          "duration": 15,
+          "created_at": "2026-09-15T12:16:27.508Z"
+        }
+      ],
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "pl-1789474599542",
+      "company_id": "comp-1789474599478",
+      "name": "Programação Principal",
+      "description": "Programação inicial com notícias RSS em tempo real e previsão do tempo.",
+      "weather_city": "São Paulo",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1789474599542-1",
+          "playlist_id": "pl-1789474599542",
+          "media_id": "med-1789474599542-weather",
+          "position": 1,
+          "duration": 12,
+          "created_at": "2026-09-15T12:16:39.478Z"
+        },
+        {
+          "id": "pli-1789474599542-2",
+          "playlist_id": "pl-1789474599542",
+          "media_id": "med-1789474599542-rss-saude",
+          "position": 2,
+          "duration": 15,
+          "created_at": "2026-09-15T12:16:39.478Z"
+        }
+      ],
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "pl-1789474608429",
+      "company_id": "comp-1789474599478",
+      "name": "Programação Almoço",
+      "description": "Cardápio e notícias da tarde",
+      "weather_city": "Campinas",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1789474608429-0",
+          "playlist_id": "pl-1789474608429",
+          "media_id": "med-1789474606869",
+          "position": 1,
+          "duration": 15,
+          "created_at": "2026-09-15T12:16:48.429Z"
+        }
+      ],
+      "created_at": "2026-09-15T12:16:48.429Z",
+      "updated_at": "2026-09-15T12:16:48.429Z"
     }
   ],
   "media": [
-    {
-      "id": "med-vert-1",
-      "company_id": "comp-demo-1",
-      "name": "Totem Promo - Dermocosméticos e Saúde (Vertical 9:16)",
-      "type": "image",
-      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1080 1920\" width=\"1080\" height=\"1920\"><defs><linearGradient id=\"bgv1\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%230f172a\"/><stop offset=\"50%\" stop-color=\"%231e3a8a\"/><stop offset=\"100%\" stop-color=\"%23091e3a\"/></linearGradient></defs><rect width=\"1080\" height=\"1920\" fill=\"url(%23bgv1)\"/><circle cx=\"900\" cy=\"350\" r=\"320\" fill=\"%232563eb\" opacity=\"0.2\"/><circle cx=\"150\" cy=\"1500\" r=\"280\" fill=\"%2338bdf8\" opacity=\"0.15\"/><rect x=\"80\" y=\"120\" width=\"360\" height=\"64\" rx=\"12\" fill=\"%232563eb\"/><text x=\"110\" y=\"162\" fill=\"%23ffffff\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DROGARIA SÃO PAULO</text><text x=\"80\" y=\"340\" fill=\"%2338bdf8\" font-size=\"42\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">FESTIVAL DE VERÃO</text><text x=\"80\" y=\"460\" fill=\"%23ffffff\" font-size=\"88\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">ATÉ 50% OFF</text><text x=\"80\" y=\"580\" fill=\"%2394a3b8\" font-size=\"36\" font-family=\"system-ui, sans-serif\">Protetores solares, hidratantes e dermocosméticos selecionados.</text><g transform=\"translate(80, 720)\"><rect width=\"920\" height=\"340\" rx=\"24\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"3\"/><text x=\"50\" y=\"90\" fill=\"%2338bdf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">OFERTA ESPECIAL DA SEMANA</text><text x=\"50\" y=\"160\" fill=\"%23ffffff\" font-size=\"52\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Compre 2 Leve 3</text><text x=\"50\" y=\"230\" fill=\"%23cbd5e1\" font-size=\"30\" font-family=\"system-ui, sans-serif\">Linha facial completa com desconto direto no caixa.</text></g><g transform=\"translate(80, 1150)\"><rect width=\"920\" height=\"420\" rx=\"24\" fill=\"%23111827\" stroke=\"%232563eb\" stroke-width=\"2\"/><circle cx=\"100\" cy=\"100\" r=\"40\" fill=\"%232563eb\"/><text x=\"88\" y=\"112\" fill=\"%23ffffff\" font-size=\"32\" font-weight=\"bold\">✓</text><text x=\"170\" y=\"95\" fill=\"%23ffffff\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Programa Fidelidade Drogarias</text><text x=\"170\" y=\"145\" fill=\"%2394a3b8\" font-size=\"28\" font-family=\"system-ui, sans-serif\">Cadastre seu CPF e acumule pontos a cada compra</text><rect x=\"50\" y=\"230\" width=\"820\" height=\"120\" rx=\"16\" fill=\"%231e3a8a\"/><text x=\"80\" y=\"305\" fill=\"%23ffffff\" font-size=\"32\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Consulte nosso farmacêutico de plantão</text></g><text x=\"80\" y=\"1740\" fill=\"%2364748b\" font-size=\"24\" font-family=\"system-ui, sans-serif\">FORMATO VERTICAL 9:16 (1080x1920) • TOTEM DIGITAL</text></svg>",
-      "duration": 8,
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "med-vert-2",
-      "company_id": "comp-demo-1",
-      "name": "Totem Saúde - Vacinação e Exames (Vertical 9:16)",
-      "type": "image",
-      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1080 1920\" width=\"1080\" height=\"1920\"><defs><linearGradient id=\"bgv2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23064e3b\"/><stop offset=\"50%\" stop-color=\"%23022c22\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1080\" height=\"1920\" fill=\"url(%23bgv2)\"/><circle cx=\"200\" cy=\"350\" r=\"320\" fill=\"%23059669\" opacity=\"0.2\"/><rect x=\"80\" y=\"120\" width=\"340\" height=\"64\" rx=\"12\" fill=\"%2310b981\"/><text x=\"110\" y=\"162\" fill=\"%23ffffff\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ESPAÇO SAÚDE</text><text x=\"80\" y=\"340\" fill=\"%2334d399\" font-size=\"42\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">CAMPANHA NACIONAL</text><text x=\"80\" y=\"460\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">VACINAÇÃO DA GRIPE</text><text x=\"80\" y=\"580\" fill=\"%23a7f3d0\" font-size=\"36\" font-family=\"system-ui, sans-serif\">Disponível para todas as idades com aplicação rápida.</text><g transform=\"translate(80, 720)\"><rect width=\"920\" height=\"360\" rx=\"24\" fill=\"%23065f46\" stroke=\"%23047857\" stroke-width=\"3\"/><text x=\"50\" y=\"90\" fill=\"%236ee7b7\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">HORÁRIO DE ATENDIMENTO</text><text x=\"50\" y=\"160\" fill=\"%23ffffff\" font-size=\"48\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Segunda a Sábado: 08h às 21h</text><text x=\"50\" y=\"230\" fill=\"%23e6fcf5\" font-size=\"32\" font-family=\"system-ui, sans-serif\">Domingos e Feriados: 09h às 18h</text><text x=\"50\" y=\"300\" fill=\"%23a7f3d0\" font-size=\"28\" font-family=\"system-ui, sans-serif\">Guichê 03 • Sem necessidade de agendamento</text></g><g transform=\"translate(80, 1160)\"><rect width=\"920\" height=\"420\" rx=\"24\" fill=\"%23111827\" stroke=\"%2310b981\" stroke-width=\"2\"/><text x=\"60\" y=\"90\" fill=\"%2334d399\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">SERVIÇOS FARMACÊUTICOS</text><text x=\"60\" y=\"160\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Aferição de Pressão Arterial</text><text x=\"60\" y=\"220\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Teste de Glicemia Capilar</text><text x=\"60\" y=\"280\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Aplicação de Injetáveis com Receita</text><text x=\"60\" y=\"340\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\">• Bioimpedância e Orientação Nutricional</text></g><text x=\"80\" y=\"1740\" fill=\"%236ee7b7\" font-size=\"24\" font-family=\"system-ui, sans-serif\">FORMATO VERTICAL 9:16 (1080x1920) • TOTEM DIGITAL</text></svg>",
-      "duration": 8,
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "med-1",
-      "company_id": "comp-demo-1",
-      "name": "Ofertas da Semana - Até 40% OFF",
-      "type": "image",
-      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%230f172a\"/><stop offset=\"100%\" stop-color=\"%231e3a8a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg)\"/><circle cx=\"1600\" cy=\"250\" r=\"380\" fill=\"%232563eb\" opacity=\"0.15\"/><circle cx=\"200\" cy=\"900\" r=\"300\" fill=\"%2338bdf8\" opacity=\"0.1\"/><rect x=\"120\" y=\"100\" width=\"220\" height=\"48\" rx=\"8\" fill=\"%232563eb\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DROGARIA SÃO PAULO</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">SEMANA DA SAÚDE E BEM-ESTAR</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">ATÉ 40% DE DESCONTO</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Em medicamentos selecionados, dermocosméticos e vitaminas.</text><rect x=\"120\" y=\"640\" width=\"560\" height=\"180\" rx=\"16\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"710\" fill=\"%2338bdf8\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CONSULTE NOSSO FARMACÊUTICO</text><text x=\"160\" y=\"760\" fill=\"%23cbd5e1\" font-size=\"22\" font-family=\"system-ui, sans-serif\">Aferição de pressão e testes rápidos disponíveis no guichê 2.</text></svg>",
-      "duration": 8,
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "med-2",
-      "company_id": "comp-demo-1",
-      "name": "Horário de Atendimento e Delivery",
-      "type": "image",
-      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23091e3a\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg2)\"/><rect x=\"120\" y=\"100\" width=\"220\" height=\"48\" rx=\"8\" fill=\"%2310b981\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ATENDIMENTO 24 HORAS</text><text x=\"120\" y=\"320\" fill=\"%2334d399\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">COMODIDADE PARA VOCÊ</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"78\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">RECEBA SEUS MEDICAMENTOS EM CASA</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Peça pelo WhatsApp oficial ou aplicativo com entrega expressa em até 45 minutos.</text><g transform=\"translate(120, 650)\"><rect width=\"450\" height=\"140\" rx=\"12\" fill=\"%231e293b\"/><text x=\"40\" y=\"60\" fill=\"%2338bdf8\" font-size=\"22\" font-family=\"system-ui, sans-serif\">WHATSAPP OFICIAL</text><text x=\"40\" y=\"105\" fill=\"%23ffffff\" font-size=\"32\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">(11) 98765-0000</text></g></svg>",
-      "duration": 8,
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "med-3",
-      "company_id": "comp-demo-1",
-      "name": "Dica de Saúde - Hidratação Diária",
-      "type": "image",
-      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg3\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23172554\"/><stop offset=\"100%\" stop-color=\"%231e293b\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg3)\"/><rect x=\"120\" y=\"100\" width=\"180\" height=\"48\" rx=\"8\" fill=\"%230284c7\"/><text x=\"140\" y=\"132\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DICA DE SAÚDE</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CUIDE DO SEU CORPO</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"80\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">VOCÊ JÁ BEBEU ÁGUA HOJE?</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">A hidratação regular melhora a disposição, circulação e o funcionamento renal.</text><rect x=\"120\" y=\"650\" width=\"700\" height=\"140\" rx=\"14\" fill=\"%230f172a\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"715\" fill=\"%2338bdf8\" font-size=\"24\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">RECOMENDAÇÃO MÉDICA</text><text x=\"160\" y=\"755\" fill=\"%23e2e8f0\" font-size=\"20\" font-family=\"system-ui, sans-serif\">Consuma no mínimo 2 litros de água filtrada ao longo do dia.</text></svg>",
-      "duration": 8,
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "med-weather-clock",
-      "company_id": "comp-demo-1",
-      "name": "Hora Certa & Previsão do Tempo",
-      "type": "weather_clock",
-      "file_url": "widget:weather_clock",
-      "duration": 12,
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.643Z",
-      "updated_at": "2026-09-15T03:30:49.643Z"
-    },
-    {
-      "id": "med-1789443049644-rss-saude",
-      "company_id": "comp-demo-1",
-      "name": "Notícias RSS - Saúde & Bem-Estar",
-      "type": "rss",
-      "file_url": "https://g1.globo.com/rss/g1/saude/",
-      "duration": 15,
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.644Z",
-      "updated_at": "2026-09-15T03:30:49.644Z"
-    },
     {
       "id": "med-1789448094259-rss-saude",
       "company_id": "comp-1789448094196",
@@ -532,54 +780,174 @@
       "active": true,
       "created_at": "2026-09-15T04:57:07.836Z",
       "updated_at": "2026-09-15T04:57:07.836Z"
+    },
+    {
+      "id": "med-1",
+      "company_id": "comp-demo-1",
+      "name": "Ofertas da Semana - Até 40% OFF",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%230f172a\"/><stop offset=\"100%\" stop-color=\"%231e3a8a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg)\"/><circle cx=\"1600\" cy=\"250\" r=\"380\" fill=\"%232563eb\" opacity=\"0.15\"/><circle cx=\"200\" cy=\"900\" r=\"300\" fill=\"%2338bdf8\" opacity=\"0.1\"/><rect x=\"120\" y=\"100\" width=\"280\" height=\"52\" rx=\"10\" fill=\"%232563eb\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DROGARIA SÃO PAULO</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">SEMANA DA SAÚDE E BEM-ESTAR</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">ATÉ 40% DE DESCONTO</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Em medicamentos selecionados, dermocosméticos e vitaminas.</text><rect x=\"120\" y=\"640\" width=\"600\" height=\"180\" rx=\"16\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"710\" fill=\"%2338bdf8\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CONSULTE NOSSO FARMACÊUTICO</text><text x=\"160\" y=\"760\" fill=\"%23cbd5e1\" font-size=\"22\" font-family=\"system-ui, sans-serif\">Aferição de pressão e testes rápidos no guichê 01.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-2",
+      "company_id": "comp-demo-1",
+      "name": "Horário de Atendimento e Delivery",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23091e3a\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg2)\"/><rect x=\"120\" y=\"100\" width=\"260\" height=\"52\" rx=\"10\" fill=\"%2310b981\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ATENDIMENTO 24 HORAS</text><text x=\"120\" y=\"320\" fill=\"%2334d399\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">COMODIDADE PARA VOCÊ</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"78\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">RECEBA MEDICAMENTOS EM CASA</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Peça pelo WhatsApp oficial com entrega expressa em até 45 minutos.</text><g transform=\"translate(120, 650)\"><rect width=\"450\" height=\"140\" rx=\"14\" fill=\"%231e293b\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"40\" y=\"60\" fill=\"%2338bdf8\" font-size=\"22\" font-family=\"system-ui, sans-serif\">WHATSAPP OFICIAL</text><text x=\"40\" y=\"105\" fill=\"%23ffffff\" font-size=\"32\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">(11) 98765-0000</text></g></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-3",
+      "company_id": "comp-demo-1",
+      "name": "Dica de Saúde - Hidratação Diária",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bg3\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23172554\"/><stop offset=\"100%\" stop-color=\"%231e293b\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bg3)\"/><rect x=\"120\" y=\"100\" width=\"200\" height=\"52\" rx=\"10\" fill=\"%230284c7\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">DICA DE SAÚDE</text><text x=\"120\" y=\"320\" fill=\"%2338bdf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CUIDE DO SEU CORPO</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"80\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">VOCÊ JÁ BEBEU ÁGUA HOJE?</text><text x=\"120\" y=\"540\" fill=\"%2394a3b8\" font-size=\"34\" font-family=\"system-ui, sans-serif\">A hidratação regular melhora a disposição, circulação e o funcionamento renal.</text><rect x=\"120\" y=\"650\" width=\"700\" height=\"140\" rx=\"14\" fill=\"%230f172a\" stroke=\"%23334155\" stroke-width=\"2\"/><text x=\"160\" y=\"715\" fill=\"%2338bdf8\" font-size=\"24\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">RECOMENDAÇÃO MÉDICA</text><text x=\"160\" y=\"755\" fill=\"%23e2e8f0\" font-size=\"20\" font-family=\"system-ui, sans-serif\">Consuma no mínimo 2 litros de água filtrada ao longo do dia.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-weather-clock",
+      "company_id": "comp-demo-1",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-rss-saude",
+      "company_id": "comp-demo-1",
+      "name": "Notícias RSS - Saúde & Bem-Estar",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/saude/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-merc-1",
+      "company_id": "comp-demo-2",
+      "name": "Festival de Hortifruti Fresco - Até 35% OFF",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bgm1\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23064e3b\"/><stop offset=\"100%\" stop-color=\"%23022c22\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bgm1)\"/><circle cx=\"1600\" cy=\"300\" r=\"350\" fill=\"%2310b981\" opacity=\"0.15\"/><rect x=\"120\" y=\"100\" width=\"340\" height=\"52\" rx=\"10\" fill=\"%23059669\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">SUPERMERCADO CENTRAL</text><text x=\"120\" y=\"320\" fill=\"%2334d399\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\" letter-spacing=\"4\">DIRETO DO PRODUTOR PARA SUA MESA</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"82\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">FESTIVAL DE HORTIFRUTI</text><text x=\"120\" y=\"540\" fill=\"%23a7f3d0\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Frutas, verduras e legumes selecionados com até 35% de desconto hoje.</text><rect x=\"120\" y=\"640\" width=\"620\" height=\"180\" rx=\"16\" fill=\"%23065f46\" stroke=\"%2310b981\" stroke-width=\"2\"/><text x=\"160\" y=\"710\" fill=\"%236ee7b7\" font-size=\"26\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">QUALIDADE E FRESCOR GARANTIDOS</text><text x=\"160\" y=\"760\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\">Reposição diária às 06h e 14h com procedência sustentável.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-merc-2",
+      "company_id": "comp-demo-2",
+      "name": "Padaria & Confeitaria Artesanal",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bgm2\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%23451a03\"/><stop offset=\"100%\" stop-color=\"%231c1917\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bgm2)\"/><rect x=\"120\" y=\"100\" width=\"280\" height=\"52\" rx=\"10\" fill=\"%23d97706\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">PADARIA ARTESANAL</text><text x=\"120\" y=\"320\" fill=\"%23fbbf24\" font-size=\"38\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">PÃO QUENTINHO A TODA HORA</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"78\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">FORNADAS A CADA 30 MINUTOS</text><text x=\"120\" y=\"540\" fill=\"%23fed7aa\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Pães franceses crocantes, bolos caseiros, salgados e cafés especiais.</text><g transform=\"translate(120, 650)\"><rect width=\"520\" height=\"140\" rx=\"14\" fill=\"%23292524\" stroke=\"%2378350f\" stroke-width=\"2\"/><text x=\"40\" y=\"60\" fill=\"%23f59e0b\" font-size=\"22\" font-family=\"system-ui, sans-serif\">COMBO CAFÉ DA MANHÃ</text><text x=\"40\" y=\"105\" fill=\"%23ffffff\" font-size=\"30\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">Pão na Chapa + Café Expresso R$ 6,90</text></g></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-merc-3",
+      "company_id": "comp-demo-2",
+      "name": "Clube de Vantagens Super Central",
+      "type": "image",
+      "file_url": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1920 1080\" width=\"1920\" height=\"1080\"><defs><linearGradient id=\"bgm3\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\"><stop offset=\"0%\" stop-color=\"%231e1b4b\"/><stop offset=\"100%\" stop-color=\"%230f172a\"/></linearGradient></defs><rect width=\"1920\" height=\"1080\" fill=\"url(%23bgm3)\"/><rect x=\"120\" y=\"100\" width=\"280\" height=\"52\" rx=\"10\" fill=\"%234f46e5\"/><text x=\"140\" y=\"134\" fill=\"%23ffffff\" font-size=\"22\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">CLUBE DE DESCONTOS</text><text x=\"120\" y=\"320\" fill=\"%23818cf8\" font-size=\"36\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">ECONOMIA REAL NO SEU DIA</text><text x=\"120\" y=\"440\" fill=\"%23ffffff\" font-size=\"80\" font-family=\"system-ui, sans-serif\" font-weight=\"900\">INFORME SEU CPF NO CAIXA</text><text x=\"120\" y=\"540\" fill=\"%23c7d2fe\" font-size=\"34\" font-family=\"system-ui, sans-serif\">Ative ofertas instantâneas pelo aplicativo e acumule pontos para trocar por prêmios.</text><rect x=\"120\" y=\"650\" width=\"650\" height=\"140\" rx=\"14\" fill=\"%231e293b\" stroke=\"%234338ca\" stroke-width=\"2\"/><text x=\"160\" y=\"715\" fill=\"%23a5b4fc\" font-size=\"24\" font-family=\"system-ui, sans-serif\" font-weight=\"bold\">BAIXE O APLICATIVO GRATUITO</text><text x=\"160\" y=\"755\" fill=\"%23ffffff\" font-size=\"20\" font-family=\"system-ui, sans-serif\">Disponível para Android e iOS na Google Play e App Store.</text></svg>",
+      "duration": 8,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-weather-clock-2",
+      "company_id": "comp-demo-2",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-rss-merc",
+      "company_id": "comp-demo-2",
+      "name": "Notícias RSS - Economia & Brasil",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/economia/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "med-1789474587551-rss-saude",
+      "company_id": "comp-1789474587508",
+      "name": "Notícias RSS - Saúde & Bem-Estar",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/saude/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "med-1789474587551-weather",
+      "company_id": "comp-1789474587508",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "med-1789474599542-rss-saude",
+      "company_id": "comp-1789474599478",
+      "name": "Notícias RSS - Saúde & Bem-Estar",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/saude/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "med-1789474599542-weather",
+      "company_id": "comp-1789474599478",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "med-1789474606869",
+      "company_id": "comp-1789474599478",
+      "name": "Cardápio do Dia",
+      "type": "image",
+      "file_url": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T12:16:46.869Z",
+      "updated_at": "2026-09-15T12:16:46.869Z"
     }
   ],
   "rss_feeds": [
-    {
-      "id": "rss-1",
-      "company_id": "comp-demo-1",
-      "name": "G1 - Saúde e Bem-Estar",
-      "url": "https://g1.globo.com/rss/g1/saude/",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "rss-1789443049644-1-6yvl",
-      "company_id": "comp-demo-1",
-      "name": "G1 - Brasil e Notícias Gerais",
-      "url": "https://g1.globo.com/rss/g1/brasil/",
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.644Z",
-      "updated_at": "2026-09-15T03:30:49.644Z"
-    },
-    {
-      "id": "rss-1789443049644-2-kwg7",
-      "company_id": "comp-demo-1",
-      "name": "Folha de S.Paulo - Em Cima da Hora",
-      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.644Z",
-      "updated_at": "2026-09-15T03:30:49.644Z"
-    },
-    {
-      "id": "rss-1789443049644-3-1cgy",
-      "company_id": "comp-demo-1",
-      "name": "G1 - Economia e Negócios",
-      "url": "https://g1.globo.com/rss/g1/economia/",
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.644Z",
-      "updated_at": "2026-09-15T03:30:49.644Z"
-    },
-    {
-      "id": "rss-1789443049644-4-f8he",
-      "company_id": "comp-demo-1",
-      "name": "G1 - Tecnologia e Inovação",
-      "url": "https://g1.globo.com/rss/g1/tecnologia/",
-      "active": true,
-      "created_at": "2026-09-15T03:30:49.644Z",
-      "updated_at": "2026-09-15T03:30:49.644Z"
-    },
     {
       "id": "rss-1789448094259-0-gb22",
       "company_id": "comp-1789448094196",
@@ -633,6 +1001,195 @@
       "active": true,
       "created_at": "2026-09-15T04:57:16.055Z",
       "updated_at": "2026-09-15T04:57:16.055Z"
+    },
+    {
+      "id": "rss-comp1-1",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp1-2",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp1-3",
+      "company_id": "comp-demo-1",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp1-4",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp1-5",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp2-1",
+      "company_id": "comp-demo-2",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp2-2",
+      "company_id": "comp-demo-2",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp2-3",
+      "company_id": "comp-demo-2",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp2-4",
+      "company_id": "comp-demo-2",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-comp2-5",
+      "company_id": "comp-demo-2",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "rss-1789474587551-0-x9m6",
+      "company_id": "comp-1789474587508",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "rss-1789474587551-1-svhn",
+      "company_id": "comp-1789474587508",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "rss-1789474587551-2-f1s0",
+      "company_id": "comp-1789474587508",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "rss-1789474587551-3-thne",
+      "company_id": "comp-1789474587508",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "rss-1789474587551-4-g5ds",
+      "company_id": "comp-1789474587508",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:27.508Z",
+      "updated_at": "2026-09-15T12:16:27.508Z"
+    },
+    {
+      "id": "rss-1789474599542-0-9uml",
+      "company_id": "comp-1789474599478",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "rss-1789474599542-1-a92m",
+      "company_id": "comp-1789474599478",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "rss-1789474599542-2-5ajj",
+      "company_id": "comp-1789474599478",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "rss-1789474599542-3-4eyt",
+      "company_id": "comp-1789474599478",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "rss-1789474599542-4-x4la",
+      "company_id": "comp-1789474599478",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:39.478Z",
+      "updated_at": "2026-09-15T12:16:39.478Z"
+    },
+    {
+      "id": "rss-1789474615702",
+      "company_id": "comp-1789474599478",
+      "name": "G1 Economia",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T12:16:55.702Z",
+      "updated_at": "2026-09-15T12:16:55.702Z"
     }
   ],
   "call_phrases": [],
@@ -648,7 +1205,53 @@
       "created_at": "2026-09-04T07:19:43.051Z"
     }
   ],
-  "sub_clients": [],
+  "sub_clients": [
+    {
+      "id": "sub-cli-1",
+      "company_id": "comp-demo-1",
+      "name": "Dr. Roberto Rocha (Consultório 02)",
+      "code": "CLI-001",
+      "phone": "(11) 98111-2233",
+      "email": "roberto@clinicaexemplo.com.br",
+      "notes": "Cliente atendido para serviços de saúde.",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "sub-cli-2",
+      "company_id": "comp-demo-1",
+      "name": "Farmácia Central Distribuidora",
+      "code": "CLI-002",
+      "phone": "(11) 98222-3344",
+      "email": "central@farmaciaexemplo.com.br",
+      "notes": "Cliente comercial para orçamentos de mídias.",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "id": "sub-cli-3",
+      "company_id": "comp-demo-2",
+      "name": "Restaurante Sabor da Terra",
+      "code": "CLI-M01",
+      "phone": "(11) 98333-4455",
+      "email": "contato@restaurantesabor.com.br",
+      "notes": "Parceiro comercial para exibição de anúncios na TV.",
+      "created_at": "2026-09-15T12:14:59.358Z",
+      "updated_at": "2026-09-15T12:14:59.358Z"
+    },
+    {
+      "company_id": "comp-1789474599478",
+      "name": "Fornecedor Hortifruti",
+      "code": "FORN-01",
+      "phone": "(11) 97777-6666",
+      "email": "horti@fornecedor.com",
+      "drive_folder_id": "",
+      "drive_folder_url": "",
+      "id": "sub-1789474613514-o62h",
+      "created_at": "2026-09-15T12:16:53.514Z",
+      "updated_at": "2026-09-15T12:16:53.514Z"
+    }
+  ],
   "drive_documents": [],
   "drive_settings": {
     "connected": false,

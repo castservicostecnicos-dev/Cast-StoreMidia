@@ -91,6 +91,23 @@ export const api = {
   deletePlan: (id: string) =>
     request<{ message: string }>(`/admin/plans/${id}`, { method: 'DELETE' }),
 
+  seedDemoData: () =>
+    request<{
+      message: string;
+      companiesCount: number;
+      operatorsCount: number;
+      playersCount: number;
+      demoClients: Array<{
+        id: string;
+        name: string;
+        segment: string;
+        companyEmail: string;
+        operatorEmail: string;
+        playerCode: string;
+        playerCodeSecondary?: string;
+      }>;
+    }>('/auth/seed-demo-data', { method: 'POST' }),
+
   // Company
   getCompanyStats: () => request<CompanyStats>('/company/stats'),
 
