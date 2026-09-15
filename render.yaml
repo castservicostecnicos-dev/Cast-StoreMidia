@@ -3,7 +3,7 @@ services:
     name: midia-indoor
     runtime: node
     plan: free
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -11,3 +11,5 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: NODE_VERSION
+        value: 20.18.0

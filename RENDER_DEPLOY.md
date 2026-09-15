@@ -21,7 +21,7 @@ Se preferir criar o serviço manualmente no Render:
 3. Configure os seguintes campos:
    - **Name:** `midia-indoor` (ou o nome que preferir)
    - **Runtime:** `Node`
-   - **Build Command:** `npm run build`
+   - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm start`
    - **Instance Type:** `Free` (ou superior)
 4. Na seção **Environment Variables** (Variáveis de Ambiente), adicione:
