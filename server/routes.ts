@@ -332,30 +332,61 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     password,
   } = req.body;
 
-  if (!legal_name || !trade_name || !cnpj || !email || !plan_id) {
-    return res.status(400).json({ error: 'Preencha todos os campos obrigatórios.' });
+  if (!legal_name || !trade_name || !cnpj || !email) {
+    return res.status(400).json({ error: 'Preencha todos os campos obrigatórios (Nome Fantasia, Razão Social, CNPJ e E-mail).' });
   }
 
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanCnpj = String(cnpj).trim();
+
   const data = db.getData();
-  const existingUser = data.users.find((u) => u.email.toLowerCase() === String(email).trim().toLowerCase());
+
+  // Validate plan
+  let selectedPlanId = plan_id;
+  if (!selectedPlanId || !data.plans.some((p) => p.id === selectedPlanId)) {
+    const firstActivePlan = data.plans.find((p) => p.active) || data.plans[0];
+    if (firstActivePlan) {
+      selectedPlanId = firstActivePlan.id;
+    } else {
+      return res.status(400).json({ error: 'Nenhum plano ativo disponível para vincular à empresa.' });
+    }
+  }
+
+  // Check existing user by email
+  const existingUser = data.users.find((u) => u.email.toLowerCase() === cleanEmail);
   if (existingUser) {
-    return res.status(400).json({ error: 'Este e-mail já está cadastrado no sistema.' });
+    return res.status(400).json({ error: `O e-mail "${cleanEmail}" já está cadastrado no sistema.` });
+  }
+
+  // Check existing company by email
+  const existingCompanyEmail = data.companies.find((c) => c.email.trim().toLowerCase() === cleanEmail);
+  if (existingCompanyEmail) {
+    return res.status(400).json({ error: `O e-mail "${cleanEmail}" já está vinculado à empresa "${existingCompanyEmail.trade_name}".` });
+  }
+
+  // Check duplicate CNPJ
+  const rawCnpj = cleanCnpj.replace(/\D/g, '');
+  if (rawCnpj.length >= 11) {
+    const existingCompanyCnpj = data.companies.find((c) => c.cnpj.replace(/\D/g, '') === rawCnpj);
+    if (existingCompanyCnpj) {
+      return res.status(400).json({ error: `O CNPJ "${cleanCnpj}" já está cadastrado para a empresa "${existingCompanyCnpj.trade_name}".` });
+    }
   }
 
   const now = new Date().toISOString();
   const companyId = `comp-${Date.now()}`;
   const newCompany: Company = {
     id: companyId,
-    legal_name,
-    trade_name,
-    cnpj,
-    email,
-    phone: phone || '',
-    responsible: responsible || '',
-    address: address || '',
-    city: city || '',
-    state: state || '',
-    plan_id,
+    legal_name: String(legal_name).trim(),
+    trade_name: String(trade_name).trim(),
+    cnpj: cleanCnpj,
+    email: cleanEmail,
+    phone: phone ? String(phone).trim() : '',
+    responsible: responsible ? String(responsible).trim() : '',
+    address: address ? String(address).trim() : '',
+    city: city ? String(city).trim() : '',
+    state: state ? String(state).trim().toUpperCase() : '',
+    plan_id: selectedPlanId,
     start_date: start_date || now.split('T')[0],
     due_date: due_date || '',
     status: 'active',
@@ -366,8 +397,8 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
   const initialPass = hashPassword(password || '123456');
   const newUser: User = {
     id: `usr-${Date.now()}`,
-    name: responsible || trade_name,
-    email: email.trim().toLowerCase(),
+    name: (responsible ? String(responsible).trim() : '') || String(trade_name).trim(),
+    email: cleanEmail,
     password_hash: initialPass.hash,
     salt: initialPass.salt,
     role: 'company',
@@ -407,7 +438,7 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     company_id: companyId,
     name: 'Programação Principal',
     description: 'Programação inicial com notícias RSS em tempo real e previsão do tempo.',
-    weather_city: city || 'São Paulo',
+    weather_city: city ? String(city).trim() : 'São Paulo',
     active: true,
     items: [
       {
@@ -463,25 +494,97 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
     start_date,
     due_date,
     status,
+    password,
   } = req.body;
 
-  if (legal_name) company.legal_name = legal_name;
-  if (trade_name) company.trade_name = trade_name;
-  if (cnpj) company.cnpj = cnpj;
-  if (email) company.email = email;
-  if (phone !== undefined) company.phone = phone;
-  if (responsible !== undefined) company.responsible = responsible;
-  if (address !== undefined) company.address = address;
-  if (city !== undefined) company.city = city;
-  if (state !== undefined) company.state = state;
-  if (plan_id) company.plan_id = plan_id;
+  // Handle email update and keep company user in sync
+  if (email) {
+    const cleanEmail = String(email).trim().toLowerCase();
+    const existingUser = data.users.find(
+      (u) => u.email.toLowerCase() === cleanEmail && u.company_id !== id
+    );
+    if (existingUser) {
+      return res.status(400).json({ error: `O e-mail "${cleanEmail}" já está em uso por outro cadastro.` });
+    }
+    company.email = cleanEmail;
+
+    const companyUser = data.users.find((u) => u.company_id === id && u.role === 'company');
+    if (companyUser) {
+      companyUser.email = cleanEmail;
+      companyUser.updated_at = new Date().toISOString();
+    }
+  }
+
+  // Handle CNPJ duplicate check
+  if (cnpj) {
+    const cleanCnpj = String(cnpj).trim();
+    const rawCnpj = cleanCnpj.replace(/\D/g, '');
+    if (rawCnpj.length >= 11) {
+      const existingCompanyCnpj = data.companies.find(
+        (c) => c.id !== id && c.cnpj.replace(/\D/g, '') === rawCnpj
+      );
+      if (existingCompanyCnpj) {
+        return res.status(400).json({ error: `O CNPJ "${cleanCnpj}" já pertence à empresa "${existingCompanyCnpj.trade_name}".` });
+      }
+    }
+    company.cnpj = cleanCnpj;
+  }
+
+  if (legal_name) company.legal_name = String(legal_name).trim();
+  if (trade_name) company.trade_name = String(trade_name).trim();
+  if (phone !== undefined) company.phone = String(phone).trim();
+  if (responsible !== undefined) company.responsible = String(responsible).trim();
+  if (address !== undefined) company.address = String(address).trim();
+  if (city !== undefined) company.city = String(city).trim();
+  if (state !== undefined) company.state = String(state).trim().toUpperCase();
+  if (plan_id && data.plans.some((p) => p.id === plan_id)) company.plan_id = plan_id;
   if (start_date) company.start_date = start_date;
   if (due_date !== undefined) company.due_date = due_date;
   if (status) company.status = status;
   company.updated_at = new Date().toISOString();
 
+  // Sync user name and optional password
+  const companyUser = data.users.find((u) => u.company_id === id && u.role === 'company');
+  if (companyUser) {
+    if (responsible || trade_name) {
+      companyUser.name = (company.responsible || company.trade_name);
+    }
+    if (password && String(password).trim().length >= 6) {
+      const hashed = hashPassword(String(password).trim());
+      companyUser.password_hash = hashed.hash;
+      companyUser.salt = hashed.salt;
+      companyUser.must_change_password = false;
+      companyUser.updated_at = new Date().toISOString();
+    }
+  }
+
   db.persist();
   res.json(company);
+});
+
+apiRouter.delete('/admin/companies/:id', requireAuth, requireRole('admin'), (req, res) => {
+  const { id } = req.params;
+  const data = db.getData();
+  const companyIndex = data.companies.findIndex((c) => c.id === id);
+  if (companyIndex === -1) {
+    return res.status(404).json({ error: 'Empresa não encontrada.' });
+  }
+
+  const company = data.companies[companyIndex];
+  data.companies.splice(companyIndex, 1);
+
+  // Cascading cleanup of linked records
+  data.users = data.users.filter((u) => u.company_id !== id);
+  data.players = data.players.filter((p) => p.company_id !== id);
+  data.operators = data.operators.filter((o) => o.company_id !== id);
+  data.playlists = data.playlists.filter((pl) => pl.company_id !== id);
+  data.media = data.media.filter((m) => m.company_id !== id);
+  data.rss_feeds = data.rss_feeds.filter((r) => r.company_id !== id);
+  data.call_phrases = data.call_phrases.filter((ph) => ph.company_id !== id);
+
+  db.persist();
+
+  res.json({ message: `Empresa "${company.trade_name}" e todos os seus dados foram excluídos com sucesso.` });
 });
 
 apiRouter.post('/admin/companies/:id/toggle-status', requireAuth, requireRole('admin'), (req, res) => {
@@ -591,6 +694,26 @@ apiRouter.post('/admin/plans/:id/toggle-status', requireAuth, requireRole('admin
     message: plan.active ? 'Plano ativado com sucesso.' : 'Plano desativado com sucesso.',
     active: plan.active,
   });
+});
+
+apiRouter.delete('/admin/plans/:id', requireAuth, requireRole('admin'), (req, res) => {
+  const { id } = req.params;
+  const data = db.getData();
+  const planIdx = data.plans.findIndex((p) => p.id === id);
+  if (planIdx === -1) {
+    return res.status(404).json({ error: 'Plano não encontrado.' });
+  }
+
+  const linkedCompanies = data.companies.filter((c) => c.plan_id === id);
+  if (linkedCompanies.length > 0) {
+    return res.status(400).json({
+      error: `Não é possível excluir este plano pois existem ${linkedCompanies.length} empresa(s) vinculada(s) a ele.`,
+    });
+  }
+
+  data.plans.splice(planIdx, 1);
+  db.persist();
+  res.json({ message: 'Plano excluído com sucesso.' });
 });
 
 // ----------------------------------------------------
@@ -1745,15 +1868,18 @@ apiRouter.get('/operator/dashboard', requireAuth, requireRole('operator', 'compa
   });
 });
 
-apiRouter.get('/operator/phrases', requireAuth, requireRole('operator'), (req: AuthenticatedRequest, res) => {
-  const companyId = req.user!.company_id!;
+apiRouter.get('/operator/phrases', requireAuth, requireRole('operator', 'company', 'admin'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.role === 'admin' && req.query.company_id ? String(req.query.company_id) : req.user!.company_id!;
   const data = db.getData();
-  const phrases = data.call_phrases.filter((ph) => ph.company_id === companyId);
+  const phrases = data.call_phrases.filter((ph) => (companyId ? ph.company_id === companyId : true));
   res.json(phrases);
 });
 
-apiRouter.post('/operator/phrases', requireAuth, requireRole('operator'), (req: AuthenticatedRequest, res) => {
-  const companyId = req.user!.company_id!;
+apiRouter.post('/operator/phrases', requireAuth, requireRole('operator', 'company', 'admin'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.role === 'admin' && req.body.company_id ? String(req.body.company_id) : req.user!.company_id;
+  if (!companyId) {
+    return res.status(400).json({ error: 'Identificação da empresa não encontrada.' });
+  }
   const { phrase } = req.body;
   if (!phrase || !phrase.trim()) {
     return res.status(400).json({ error: 'A frase é obrigatória.' });
@@ -1777,11 +1903,11 @@ apiRouter.post('/operator/phrases', requireAuth, requireRole('operator'), (req: 
   res.status(201).json(newPhrase);
 });
 
-apiRouter.put('/operator/phrases/:id', requireAuth, requireRole('operator'), (req: AuthenticatedRequest, res) => {
-  const companyId = req.user!.company_id!;
+apiRouter.put('/operator/phrases/:id', requireAuth, requireRole('operator', 'company', 'admin'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id;
   const { id } = req.params;
   const data = db.getData();
-  const phrase = data.call_phrases.find((p) => p.id === id && p.company_id === companyId);
+  const phrase = data.call_phrases.find((p) => p.id === id && (companyId ? p.company_id === companyId : true));
   if (!phrase) {
     return res.status(404).json({ error: 'Frase não encontrada.' });
   }
@@ -1795,11 +1921,11 @@ apiRouter.put('/operator/phrases/:id', requireAuth, requireRole('operator'), (re
   res.json(phrase);
 });
 
-apiRouter.delete('/operator/phrases/:id', requireAuth, requireRole('operator'), (req: AuthenticatedRequest, res) => {
-  const companyId = req.user!.company_id!;
+apiRouter.delete('/operator/phrases/:id', requireAuth, requireRole('operator', 'company', 'admin'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id;
   const { id } = req.params;
   const data = db.getData();
-  const idx = data.call_phrases.findIndex((p) => p.id === id && p.company_id === companyId);
+  const idx = data.call_phrases.findIndex((p) => p.id === id && (companyId ? p.company_id === companyId : true));
   if (idx === -1) {
     return res.status(404).json({ error: 'Frase não encontrada.' });
   }

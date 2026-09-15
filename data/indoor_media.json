@@ -64,6 +64,45 @@
       "must_change_password": false,
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "usr-1789448094259",
+      "name": "Carlos",
+      "email": "teste@empresa.com",
+      "password_hash": "86948c867acca6c1f073a5c6d6319177e4e932698dba3bc5d158bbf57229deae7976ef741fca58277647d4ccaefb78c65eeb08beea0e928d9aedaa5f395ee7f2",
+      "salt": "86195581243f7c247d592e41cbb049b1",
+      "role": "company",
+      "company_id": "comp-1789448094196",
+      "active": true,
+      "must_change_password": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "usr-play-1789448218666",
+      "name": "TV Recepção",
+      "email": "player_1789448218623@indoor.local",
+      "password_hash": "b2ecf3b0e05940bc8322cff541ec6992e7902f884ee14e7f537365a95cd143e92c9394944387bf229c7a9b0618bf389c8d27be12fcaa2a7b757c414959965742",
+      "salt": "0fcb1e73e34e32e15eec26cb6e344d8c",
+      "role": "player",
+      "company_id": "comp-1789448094196",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T04:56:58.623Z",
+      "updated_at": "2026-09-15T04:56:58.623Z"
+    },
+    {
+      "id": "usr-op-1789448222632",
+      "name": "Operador 1",
+      "email": "op1@empresa.com",
+      "password_hash": "89e05c082f8a0f1a9c60b5645a0ace90101dafa44ac451ecb1a04560d197b717731bed96272b737cde9dc87939f2fa0d277914b2710bcfa23726ec9e7d238519",
+      "salt": "bbd80bd3c9a82a909f50f105c66fa4af",
+      "role": "operator",
+      "company_id": "comp-1789448094196",
+      "active": true,
+      "must_change_password": false,
+      "created_at": "2026-09-15T04:57:02.589Z",
+      "updated_at": "2026-09-15T04:57:02.589Z"
     }
   ],
   "companies": [
@@ -78,50 +117,116 @@
       "address": "Av. Paulista, 1000",
       "city": "São Paulo",
       "state": "SP",
-      "plan_id": "plan-pro",
+      "plan_id": "plan-call-inter",
       "start_date": "2026-01-01",
       "due_date": "2027-01-01",
       "status": "active",
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "comp-1789448094196",
+      "legal_name": "Empresa Teste Ltda",
+      "trade_name": "Empresa Teste",
+      "cnpj": "12.345.678/0001-90",
+      "email": "teste@empresa.com",
+      "phone": "11999999999",
+      "responsible": "Carlos",
+      "address": "",
+      "city": "São Paulo",
+      "state": "SP",
+      "plan_id": "plan-call-basic",
+      "start_date": "2026-09-15",
+      "due_date": "",
+      "status": "active",
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
     }
   ],
   "plans": [
     {
-      "id": "plan-basic",
-      "name": "Plano Básico",
-      "description": "Ideal para clínicas e pequenos estabelecimentos.",
-      "max_players": 2,
-      "max_operators": 2,
+      "id": "plan-call-basic",
+      "name": "Call Básico",
+      "description": "1 tela com chamadas completas de atendimento e até 4 operadores autorizados (proporção 4:1).",
+      "max_players": 1,
+      "max_operators": 4,
       "max_storage": 50,
-      "monthly_price": 99,
+      "monthly_price": 49,
       "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:47:43.316Z"
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
     },
     {
-      "id": "plan-pro",
-      "name": "Plano Profissional",
-      "description": "Para médias empresas com múltiplos pontos de exibição.",
-      "max_players": 10,
-      "max_operators": 10,
-      "max_storage": 200,
-      "monthly_price": 209,
+      "id": "plan-call-inter",
+      "name": "Call Intermediário",
+      "description": "3 telas com chamadas no painel e até 12 operadores de guichê (proporção 4:1).",
+      "max_players": 3,
+      "max_operators": 12,
+      "max_storage": 150,
+      "monthly_price": 109,
       "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:46:13.231Z"
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
     },
     {
-      "id": "plan-enterprise",
-      "name": "Plano Empresarial",
-      "description": "Escala total com capacidade para redes e franquias.",
-      "max_players": 25,
-      "max_operators": 25,
-      "max_storage": 350,
-      "monthly_price": 309,
+      "id": "plan-call-pro",
+      "name": "Call Pro",
+      "description": "6 telas com chamadas simultâneas e até 24 operadores de guichê (proporção 4:1).",
+      "max_players": 6,
+      "max_operators": 24,
+      "max_storage": 300,
+      "monthly_price": 229,
       "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:47:18.654Z"
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
+    },
+    {
+      "id": "plan-show-basic",
+      "name": "Show Básico",
+      "description": "Exibição de mídia indoor, propagandas, hora certa e notícias RSS em até 2 telas (sem operador).",
+      "max_players": 2,
+      "max_operators": 0,
+      "max_storage": 50,
+      "monthly_price": 29,
+      "active": true,
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
+    },
+    {
+      "id": "plan-show-inter",
+      "name": "Show Intermediário",
+      "description": "Até 5 telas simultâneas com notícias e mídias institucionais personalizadas (sem operador).",
+      "max_players": 5,
+      "max_operators": 0,
+      "max_storage": 150,
+      "monthly_price": 89,
+      "active": true,
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
+    },
+    {
+      "id": "plan-show-pro",
+      "name": "Show Pro",
+      "description": "Até 12 telas para redes e múltiplos pontos comerciais focados em publicidade e notícias (sem operador).",
+      "max_players": 12,
+      "max_operators": 0,
+      "max_storage": 500,
+      "monthly_price": 149,
+      "active": true,
+      "created_at": "2026-09-01T00:00:00.000Z",
+      "updated_at": "2026-09-05T00:00:00.000Z"
+    },
+    {
+      "id": "plan-1789448208335",
+      "name": "Plano Teste",
+      "description": "Descrição do plano teste",
+      "max_players": 2,
+      "max_operators": 4,
+      "max_storage": 100,
+      "monthly_price": 59.9,
+      "active": true,
+      "created_at": "2026-09-15T04:56:48.335Z",
+      "updated_at": "2026-09-15T04:56:48.335Z"
     }
   ],
   "players": [
@@ -138,7 +243,8 @@
       "status": "active",
       "last_seen": "2026-09-03T11:43:03.408Z",
       "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
+      "updated_at": "2026-09-03T11:29:04.566Z",
+      "access_token": "tok_a94aae0b4430e3b26406088028a31e89"
     },
     {
       "id": "play-2",
@@ -153,7 +259,24 @@
       "status": "active",
       "last_seen": "2026-09-03T10:29:04.697Z",
       "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
+      "updated_at": "2026-09-03T11:29:04.566Z",
+      "access_token": "tok_df9ade9b4744c56d0c5171381010bf55"
+    },
+    {
+      "id": "play-1789448218666",
+      "company_id": "comp-1789448094196",
+      "user_id": "usr-play-1789448218666",
+      "name": "TV Recepção",
+      "code": "PLAY-01",
+      "location": "Entrada Principal",
+      "description": "",
+      "orientation": "horizontal",
+      "playlist_id": null,
+      "status": "active",
+      "access_token": "tok_d2c00e3da971977948733bfe08ecf476",
+      "last_seen": "1970-01-01T00:00:00.000Z",
+      "created_at": "2026-09-15T04:56:58.623Z",
+      "updated_at": "2026-09-15T04:56:58.623Z"
     }
   ],
   "operators": [
@@ -167,6 +290,17 @@
       "active": true,
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "op-1789448222632",
+      "company_id": "comp-1789448094196",
+      "user_id": "usr-op-1789448222632",
+      "name": "Operador 1",
+      "email": "op1@empresa.com",
+      "phone": "11988888888",
+      "active": true,
+      "created_at": "2026-09-15T04:57:02.589Z",
+      "updated_at": "2026-09-15T04:57:02.589Z"
     }
   ],
   "playlists": [
@@ -200,6 +334,22 @@
           "position": 3,
           "duration": 8,
           "created_at": "2026-09-03T11:29:04.566Z"
+        },
+        {
+          "id": "pli-1789443049644-weather",
+          "playlist_id": "pl-1",
+          "media_id": "med-weather-clock",
+          "position": 4,
+          "duration": 12,
+          "created_at": "2026-09-15T03:30:49.643Z"
+        },
+        {
+          "id": "pli-1789443049644-rss",
+          "playlist_id": "pl-1",
+          "media_id": "med-1789443049644-rss-saude",
+          "position": 5,
+          "duration": 15,
+          "created_at": "2026-09-15T03:30:49.644Z"
         }
       ],
       "created_at": "2026-09-03T11:29:04.566Z",
@@ -231,6 +381,45 @@
       ],
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "pl-1789448094259",
+      "company_id": "comp-1789448094196",
+      "name": "Programação Principal",
+      "description": "Programação inicial com notícias RSS em tempo real e previsão do tempo.",
+      "weather_city": "São Paulo",
+      "active": true,
+      "items": [
+        {
+          "id": "pli-1789448094260-1",
+          "playlist_id": "pl-1789448094259",
+          "media_id": "med-1789448094259-weather",
+          "position": 1,
+          "duration": 12,
+          "created_at": "2026-09-15T04:54:54.196Z"
+        },
+        {
+          "id": "pli-1789448094260-2",
+          "playlist_id": "pl-1789448094259",
+          "media_id": "med-1789448094259-rss-saude",
+          "position": 2,
+          "duration": 15,
+          "created_at": "2026-09-15T04:54:54.196Z"
+        }
+      ],
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "pl-1789448225723",
+      "company_id": "comp-1789448094196",
+      "name": "Playlist Manhã",
+      "description": "Programação matutina",
+      "weather_city": "São Paulo",
+      "active": true,
+      "items": [],
+      "created_at": "2026-09-15T04:57:05.723Z",
+      "updated_at": "2026-09-15T04:57:05.723Z"
     }
   ],
   "media": [
@@ -288,6 +477,61 @@
       "active": true,
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "med-weather-clock",
+      "company_id": "comp-demo-1",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.643Z",
+      "updated_at": "2026-09-15T03:30:49.643Z"
+    },
+    {
+      "id": "med-1789443049644-rss-saude",
+      "company_id": "comp-demo-1",
+      "name": "Notícias RSS - Saúde & Bem-Estar",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/saude/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.644Z",
+      "updated_at": "2026-09-15T03:30:49.644Z"
+    },
+    {
+      "id": "med-1789448094259-rss-saude",
+      "company_id": "comp-1789448094196",
+      "name": "Notícias RSS - Saúde & Bem-Estar",
+      "type": "rss",
+      "file_url": "https://g1.globo.com/rss/g1/saude/",
+      "duration": 15,
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "med-1789448094259-weather",
+      "company_id": "comp-1789448094196",
+      "name": "Hora Certa & Previsão do Tempo",
+      "type": "weather_clock",
+      "file_url": "widget:weather_clock",
+      "duration": 12,
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "med-1789448227836",
+      "company_id": "comp-1789448094196",
+      "name": "Banner Promocional",
+      "type": "image",
+      "file_url": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1920",
+      "duration": 10,
+      "active": true,
+      "created_at": "2026-09-15T04:57:07.836Z",
+      "updated_at": "2026-09-15T04:57:07.836Z"
     }
   ],
   "rss_feeds": [
@@ -299,46 +543,99 @@
       "active": true,
       "created_at": "2026-09-03T11:29:04.566Z",
       "updated_at": "2026-09-03T11:29:04.566Z"
+    },
+    {
+      "id": "rss-1789443049644-1-6yvl",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.644Z",
+      "updated_at": "2026-09-15T03:30:49.644Z"
+    },
+    {
+      "id": "rss-1789443049644-2-kwg7",
+      "company_id": "comp-demo-1",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.644Z",
+      "updated_at": "2026-09-15T03:30:49.644Z"
+    },
+    {
+      "id": "rss-1789443049644-3-1cgy",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.644Z",
+      "updated_at": "2026-09-15T03:30:49.644Z"
+    },
+    {
+      "id": "rss-1789443049644-4-f8he",
+      "company_id": "comp-demo-1",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T03:30:49.644Z",
+      "updated_at": "2026-09-15T03:30:49.644Z"
+    },
+    {
+      "id": "rss-1789448094259-0-gb22",
+      "company_id": "comp-1789448094196",
+      "name": "G1 - Saúde e Bem-Estar",
+      "url": "https://g1.globo.com/rss/g1/saude/",
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "rss-1789448094259-1-711m",
+      "company_id": "comp-1789448094196",
+      "name": "G1 - Brasil e Notícias Gerais",
+      "url": "https://g1.globo.com/rss/g1/brasil/",
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "rss-1789448094259-2-d9yc",
+      "company_id": "comp-1789448094196",
+      "name": "Folha de S.Paulo - Em Cima da Hora",
+      "url": "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "rss-1789448094259-3-jv55",
+      "company_id": "comp-1789448094196",
+      "name": "G1 - Economia e Negócios",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "rss-1789448094259-4-zuc5",
+      "company_id": "comp-1789448094196",
+      "name": "G1 - Tecnologia e Inovação",
+      "url": "https://g1.globo.com/rss/g1/tecnologia/",
+      "active": true,
+      "created_at": "2026-09-15T04:54:54.196Z",
+      "updated_at": "2026-09-15T04:54:54.196Z"
+    },
+    {
+      "id": "rss-1789448236055",
+      "company_id": "comp-1789448094196",
+      "name": "Feed Economia",
+      "url": "https://g1.globo.com/rss/g1/economia/",
+      "active": true,
+      "created_at": "2026-09-15T04:57:16.055Z",
+      "updated_at": "2026-09-15T04:57:16.055Z"
     }
   ],
-  "call_phrases": [
-    {
-      "id": "phr-1",
-      "company_id": "comp-demo-1",
-      "operator_id": "op-1",
-      "phrase": "Cliente, favor dirigir-se ao atendimento.",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "phr-2",
-      "company_id": "comp-demo-1",
-      "operator_id": "op-1",
-      "phrase": "Senha 25, dirigir-se ao caixa 03.",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "phr-3",
-      "company_id": "comp-demo-1",
-      "operator_id": "op-1",
-      "phrase": "Favor comparecer à recepção.",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    },
-    {
-      "id": "phr-4",
-      "company_id": "comp-demo-1",
-      "operator_id": "op-1",
-      "phrase": "Próximo atendimento, guichê 01.",
-      "active": true,
-      "created_at": "2026-09-03T11:29:04.566Z",
-      "updated_at": "2026-09-03T11:29:04.566Z"
-    }
-  ],
+  "call_phrases": [],
   "player_calls": [
     {
       "id": "call-1788506383051",
@@ -350,5 +647,11 @@
       "duration": 10,
       "created_at": "2026-09-04T07:19:43.051Z"
     }
-  ]
+  ],
+  "sub_clients": [],
+  "drive_documents": [],
+  "drive_settings": {
+    "connected": false,
+    "root_folder_name": "MÍDIA INDOOR - ARQUIVOS DO SISTEMA"
+  }
 }

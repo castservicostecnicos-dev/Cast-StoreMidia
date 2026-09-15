@@ -78,6 +78,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     }),
+  deleteCompany: (id: string) =>
+    request<{ message: string }>(`/admin/companies/${id}`, { method: 'DELETE' }),
 
   getPlans: () => request<Plan[]>('/admin/plans'),
   createPlan: (data: Partial<Plan>) =>
@@ -86,6 +88,8 @@ export const api = {
     request<Plan>(`/admin/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   togglePlanStatus: (id: string) =>
     request<{ message: string; active: boolean }>(`/admin/plans/${id}/toggle-status`, { method: 'POST' }),
+  deletePlan: (id: string) =>
+    request<{ message: string }>(`/admin/plans/${id}`, { method: 'DELETE' }),
 
   // Company
   getCompanyStats: () => request<CompanyStats>('/company/stats'),

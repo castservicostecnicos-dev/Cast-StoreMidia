@@ -22,6 +22,9 @@ import {
   Filter,
   FileSpreadsheet,
   UploadCloud,
+  Trash2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { Company, Plan, AdminStats } from '../types';
@@ -120,8 +123,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Modals
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [planModalError, setPlanModalError] = useState<string | null>(null);
 
   // Password reset modal
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -220,6 +228,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, []);
 
   const handleOpenCompanyModal = (company?: Company) => {
+    setModalError(null);
     if (company) {
       setEditingCompany(company);
       setCompanyForm({
@@ -232,13 +241,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         address: company.address || '',
         city: company.city || '',
         state: company.state || '',
-        plan_id: company.plan_id,
+        plan_id: company.plan_id || (plans[0]?.id || ''),
         start_date: company.start_date || '',
         due_date: company.due_date || '',
         password: '',
       });
     } else {
       setEditingCompany(null);
+      const defaultPlan = plans.find((p) => p.active) || plans[0];
       setCompanyForm({
         legal_name: '',
         trade_name: '',
@@ -249,7 +259,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         address: '',
         city: '',
         state: '',
-        plan_id: plans[0]?.id || '',
+        plan_id: defaultPlan?.id || '',
         start_date: new Date().toISOString().split('T')[0],
         due_date: '',
         password: '',
@@ -260,6 +270,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError(null);
+    setIsSavingCompany(true);
     try {
       if (editingCompany) {
         await api.updateCompany(editingCompany.id, companyForm);
@@ -269,10 +281,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         showToast('success', 'Empresa cadastrada com sucesso.');
       }
       setCompanyModalOpen(false);
-      loadData();
+      await loadData();
     } catch (err: any) {
-      showToast('error', err.message || 'Erro ao salvar empresa.');
+      const msg = err.message || 'Erro ao salvar empresa.';
+      setModalError(msg);
+      showToast('error', msg);
+    } finally {
+      setIsSavingCompany(false);
     }
+  };
+
+  const handleDeleteCompany = (company: Company) => {
+    setConfirmData({
+      isOpen: true,
+      title: 'Excluir Empresa',
+      message: `Tem certeza que deseja excluir permanentemente a empresa "${company.trade_name}"? Esta ação removerá seus acessos, players, operadores e mídias vinculadas.`,
+      action: async () => {
+        try {
+          const res = await api.deleteCompany(company.id);
+          showToast('success', res.message);
+          setConfirmData((prev) => ({ ...prev, isOpen: false }));
+          loadData();
+        } catch (err: any) {
+          showToast('error', err.message || 'Erro ao excluir empresa.');
+        }
+      },
+    });
+  };
+
+  const handleDeletePlan = (plan: Plan) => {
+    const linked = companies.filter((c) => c.plan_id === plan.id);
+    if (linked.length > 0) {
+      showToast('error', `Não é possível excluir o plano "${plan.name}" pois existem ${linked.length} empresa(s) vinculada(s) a ele.`);
+      return;
+    }
+    setConfirmData({
+      isOpen: true,
+      title: 'Excluir Plano',
+      message: `Deseja excluir permanentemente o plano "${plan.name}"?`,
+      action: async () => {
+        try {
+          const res = await api.deletePlan(plan.id);
+          showToast('success', res.message);
+          setConfirmData((prev) => ({ ...prev, isOpen: false }));
+          loadData();
+        } catch (err: any) {
+          showToast('error', err.message || 'Erro ao excluir plano.');
+        }
+      },
+    });
   };
 
   const handleToggleCompany = (company: Company) => {
@@ -310,6 +367,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleOpenPlanModal = (plan?: Plan) => {
+    setPlanModalError(null);
     if (plan) {
       setEditingPlan(plan);
       setPlanForm({
@@ -341,6 +399,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleApplyPlanTemplate = (tpl: (typeof PLAN_TEMPLATES)[0]) => {
+    setPlanModalError(null);
     setPlanForm({
       name: tpl.name,
       description: tpl.description,
@@ -356,6 +415,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSavePlan = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPlanModalError(null);
+    setIsSavingPlan(true);
     const payload = {
       ...planForm,
       max_players: Math.max(1, Number(planForm.max_players) || 1),
@@ -372,9 +433,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         showToast('success', 'Plano criado com sucesso.');
       }
       setPlanModalOpen(false);
-      loadData();
+      await loadData();
     } catch (err: any) {
-      showToast('error', err.message);
+      const msg = err.message || 'Erro ao salvar plano.';
+      setPlanModalError(msg);
+      showToast('error', msg);
+    } finally {
+      setIsSavingPlan(false);
     }
   };
 
@@ -1017,6 +1082,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span>{c.status === 'active' ? 'Desativar' : 'Ativar'}</span>
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCompany(c)}
+                      className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl border border-rose-900/60 bg-rose-950/20 hover:bg-rose-950/50 active:bg-rose-950/80 text-rose-400 font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Excluir Empresa</span>
+                    </button>
                   </div>
                 </div>
               ))
@@ -1114,6 +1188,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             }`}
                           >
                             {c.status === 'active' ? 'Desativar' : 'Ativar'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCompany(c)}
+                            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-950/50 border border-transparent hover:border-rose-700/50 transition cursor-pointer"
+                            title="Excluir empresa"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -1222,6 +1303,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   >
                     {p.active ? 'Desativar' : 'Ativar'}
                   </button>
+                  <button
+                    onClick={() => handleDeletePlan(p)}
+                    className="p-1.5 rounded-lg border border-transparent hover:border-rose-800 text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+                    title="Excluir plano"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -1275,6 +1363,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* Formulário com Corpo Rolável e Rodapé Fixo */}
             <form onSubmit={handleSaveCompany} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 text-xs">
+                {modalError && (
+                  <div className="rounded-xl border border-rose-700/80 bg-rose-950/60 p-3.5 text-rose-200 flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold block">Não foi possível salvar:</span>
+                      <span>{modalError}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* SEÇÃO 1: Identificação Cadastral */}
                 <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
@@ -1472,26 +1570,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* SEÇÃO 5: Senha Inicial (apenas para cadastro novo) */}
-                {!editingCompany && (
-                  <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
-                      5. Acesso Inicial
-                    </span>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Senha Inicial de Acesso
-                      </label>
-                      <input
-                        type="password"
-                        value={companyForm.password}
-                        onChange={(e) => setCompanyForm({ ...companyForm, password: e.target.value })}
-                        placeholder="Padrão: 123456 (troca obrigatória no primeiro acesso)"
-                        className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                {/* SEÇÃO 5: Senha de Acesso */}
+                <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                    {editingCompany ? '5. Atualizar Senha de Acesso (Opcional)' : '5. Senha Inicial de Acesso'}
+                  </span>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      {editingCompany ? 'Nova Senha (deixe em branco para manter a atual)' : 'Senha Inicial de Acesso'}
+                    </label>
+                    <input
+                      type="password"
+                      value={companyForm.password}
+                      onChange={(e) => setCompanyForm({ ...companyForm, password: e.target.value })}
+                      placeholder={editingCompany ? 'Digite caso queira alterar a senha de acesso da empresa...' : 'Padrão: 123456 (troca no primeiro acesso)'}
+                      className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Rodapé Fixo com Botões Visíveis em Qualquer Dispositivo */}
@@ -1505,10 +1601,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                  disabled={isSavingCompany}
+                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  <Check className="h-4 w-4" />
-                  <span>{editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}</span>
+                  {isSavingCompany ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>{editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1539,6 +1645,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <form onSubmit={handleSavePlan} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4 text-xs">
+                {planModalError && (
+                  <div className="rounded-xl border border-rose-700/80 bg-rose-950/60 p-3 text-rose-200 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold block">Erro ao salvar plano:</span>
+                      <span>{planModalError}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Seletor de Modelos Predefinidos */}
                 <div className="rounded-xl border border-slate-700 bg-slate-900/90 p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -1758,9 +1874,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-xs font-bold uppercase tracking-wider text-white shadow-md transition cursor-pointer"
+                  disabled={isSavingPlan}
+                  className="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:opacity-50 text-xs font-bold uppercase tracking-wider text-white shadow-md flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  Salvar Plano
+                  {isSavingPlan ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <span>Salvar Plano</span>
+                  )}
                 </button>
               </div>
             </form>
