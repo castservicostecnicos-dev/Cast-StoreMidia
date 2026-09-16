@@ -7,8 +7,68 @@ let firestoreInstance: Firestore | null = null;
 let lastSyncTimestamp: string | null = null;
 let lastSyncError: string | null = null;
 let isSyncing = false;
+let isSyncEnabled = false;
 let pendingDataToSync: any = null;
 let syncDebounceTimer: NodeJS.Timeout | null = null;
+
+export interface FirebaseConfigShape {
+  projectId: string;
+  apiKey: string;
+  appId?: string;
+  authDomain?: string;
+  firestoreDatabaseId?: string;
+}
+
+export type FirestoreLoadResult =
+  | { status: 'found'; data: any }
+  | { status: 'not_found' }
+  | { status: 'error'; error: string }
+  | { status: 'unconfigured' };
+
+/**
+ * Retrieve Firebase credentials from file or environment variables
+ */
+export function getFirebaseConfig(): FirebaseConfigShape | null {
+  // 1. Try firebase-applet-config.json file
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    try {
+      const raw = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(raw);
+      if (config.projectId && config.apiKey) {
+        return config;
+      }
+    } catch (e: any) {
+      console.warn('[Firebase] Error reading firebase-applet-config.json:', e?.message || e);
+    }
+  }
+
+  // 2. Try FIREBASE_CONFIG or FIREBASE_CONFIG_JSON env vars
+  const envJson = process.env.FIREBASE_CONFIG || process.env.FIREBASE_CONFIG_JSON;
+  if (envJson) {
+    try {
+      const config = JSON.parse(envJson);
+      if (config.projectId && config.apiKey) {
+        return config;
+      }
+    } catch (e: any) {
+      console.warn('[Firebase] Error parsing FIREBASE_CONFIG env var:', e?.message || e);
+    }
+  }
+
+  // 3. Try individual env variables
+  if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_API_KEY) {
+    return {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      apiKey: process.env.FIREBASE_API_KEY,
+      appId: process.env.FIREBASE_APP_ID || '',
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || `${process.env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
+      firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || 'ai-studio-mdiaindoor-0ee6f26d-4225-42ad-910a-5d51615f2900',
+    };
+  }
+
+  return null;
+}
 
 export function getFirestoreDb(): Firestore | null {
   if (firestoreInstance) {
@@ -16,17 +76,9 @@ export function getFirestoreDb(): Firestore | null {
   }
 
   try {
-    const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-    if (!fs.existsSync(configPath)) {
-      console.warn('[Firebase] firebase-applet-config.json not found.');
-      return null;
-    }
-
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    const config = JSON.parse(raw);
-
-    if (!config.projectId || !config.apiKey) {
-      console.warn('[Firebase] Incomplete Firebase configuration in firebase-applet-config.json.');
+    const config = getFirebaseConfig();
+    if (!config) {
+      console.warn('[Firebase] No Firebase credentials found in file or environment variables.');
       return null;
     }
 
@@ -53,35 +105,46 @@ export function getFirestoreDb(): Firestore | null {
 }
 
 /**
- * Load database snapshot from Firebase Firestore
+ * Enable live two-way sync after server boot completes
  */
-export async function loadDatabaseFromFirestore(): Promise<any | null> {
+export function enableFirestoreSync() {
+  isSyncEnabled = true;
+  console.log('[Firebase Firestore] Live synchronization is now ACTIVE.');
+}
+
+/**
+ * Load database snapshot from Firebase Firestore with explicit status
+ */
+export async function loadDatabaseFromFirestore(): Promise<FirestoreLoadResult> {
   const db = getFirestoreDb();
-  if (!db) return null;
+  if (!db) {
+    return { status: 'unconfigured' };
+  }
 
   try {
     const targetDoc = doc(db, 'app_data', 'indoor_media_db');
     const snap = await getDoc(targetDoc);
 
     if (!snap.exists()) {
-      console.log('[Firebase Firestore] No existing database snapshot found in Firestore yet.');
-      return null;
+      console.log('[Firebase Firestore] Document app_data/indoor_media_db does not exist yet (first initialization).');
+      return { status: 'not_found' };
     }
 
     const docData = snap.data();
     if (!docData || !docData.data) {
       console.warn('[Firebase Firestore] Snapshot document is empty.');
-      return null;
+      return { status: 'not_found' };
     }
 
     const parsed = JSON.parse(docData.data);
     lastSyncTimestamp = docData.updated_at || new Date().toISOString();
-    console.log(`[Firebase Firestore] Successfully restored database! Companies: ${parsed.companies?.length || 0}, Players: ${parsed.players?.length || 0}`);
-    return parsed;
+    console.log(`[Firebase Firestore] Successfully retrieved data snapshot! Companies: ${parsed.companies?.length || 0}, Players: ${parsed.players?.length || 0}, Users: ${parsed.users?.length || 0}`);
+    return { status: 'found', data: parsed };
   } catch (err: any) {
-    console.error('[Firebase Firestore] Error reading from Firestore:', err?.message || err);
-    lastSyncError = err?.message || 'Error reading from Firestore';
-    return null;
+    const msg = err?.message || String(err);
+    console.error('[Firebase Firestore] Error reading from Firestore:', msg);
+    lastSyncError = msg;
+    return { status: 'error', error: msg };
   }
 }
 
@@ -91,6 +154,12 @@ export async function loadDatabaseFromFirestore(): Promise<any | null> {
 export async function saveDatabaseToFirestoreNow(data: any): Promise<boolean> {
   const db = getFirestoreDb();
   if (!db) return false;
+
+  // Safety validation: verify minimum database structure to prevent accidental empty overwrites
+  if (!data || !Array.isArray(data.users) || !data.users.some((u: any) => u.role === 'admin')) {
+    console.error('[Firebase Firestore] ABORTED save to Firestore: data is invalid or missing required admin user!');
+    return false;
+  }
 
   try {
     const targetDoc = doc(db, 'app_data', 'indoor_media_db');
@@ -112,7 +181,7 @@ export async function saveDatabaseToFirestoreNow(data: any): Promise<boolean> {
 
     lastSyncTimestamp = now;
     lastSyncError = null;
-    console.log(`[Firebase Firestore] Database synced successfully at ${now}`);
+    console.log(`[Firebase Firestore] Database synced successfully at ${now} (Companies: ${sanitized.companies?.length || 0})`);
     return true;
   } catch (err: any) {
     console.error('[Firebase Firestore] Failed to save database to Firestore:', err?.message || err);
@@ -125,6 +194,11 @@ export async function saveDatabaseToFirestoreNow(data: any): Promise<boolean> {
  * Queue debounced background sync to Firestore
  */
 export function queueFirestoreSync(data: any) {
+  if (!isSyncEnabled) {
+    console.log('[Firebase Firestore] Sync is paused during initial startup.');
+    return;
+  }
+
   pendingDataToSync = data;
 
   if (syncDebounceTimer) {
@@ -143,11 +217,11 @@ export function queueFirestoreSync(data: any) {
     } finally {
       isSyncing = false;
       // If new data arrived while saving, trigger another sync
-      if (pendingDataToSync) {
+      if (pendingDataToSync && isSyncEnabled) {
         queueFirestoreSync(pendingDataToSync);
       }
     }
-  }, 1000); // Debounce by 1 second to batch rapid writes
+  }, 1000);
 }
 
 export function getFirestoreSyncStatus() {
@@ -158,5 +232,6 @@ export function getFirestoreSyncStatus() {
     lastSyncTimestamp,
     lastSyncError,
     isSyncing,
+    isSyncEnabled,
   };
 }

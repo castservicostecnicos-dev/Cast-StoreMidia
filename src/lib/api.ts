@@ -83,6 +83,14 @@ export const api = {
         isSyncing: boolean;
       };
     }>('/admin/firestore/sync', { method: 'POST' }),
+  exportBackup: () => {
+    window.location.href = '/api/admin/backup/export';
+  },
+  importBackup: (backup: any) =>
+    request<{ success: boolean; message: string }>('/admin/backup/import', {
+      method: 'POST',
+      body: JSON.stringify({ backup }),
+    }),
   getCompanies: () => request<Company[]>('/admin/companies'),
   createCompany: (data: Partial<Company> & { password?: string }) =>
     request<Company>('/admin/companies', { method: 'POST', body: JSON.stringify(data) }),

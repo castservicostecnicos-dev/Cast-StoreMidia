@@ -6,6 +6,7 @@ import {
   saveDatabaseToFirestoreNow,
   queueFirestoreSync,
   getFirestoreSyncStatus,
+  enableFirestoreSync,
 } from './firestore.js';
 
 export interface User {
@@ -563,15 +564,27 @@ class DatabaseStore {
         }
 
         if (changed) {
-          this.save();
+          try {
+            fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+          } catch (e) {
+            console.warn('[DatabaseStore] Could not write normalized cache to disk:', e);
+          }
         }
       } catch {
         this.data = this.createInitialData();
-        this.save();
+        try {
+          fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+        } catch (e) {
+          console.warn('[DatabaseStore] Could not write initial data to disk:', e);
+        }
       }
     } else {
       this.data = this.createInitialData();
-      this.save();
+      try {
+        fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+      } catch (e) {
+        console.warn('[DatabaseStore] Could not initialize disk cache:', e);
+      }
     }
   }
 
@@ -588,26 +601,62 @@ class DatabaseStore {
   public async initFromFirestore(): Promise<void> {
     try {
       console.log('[DatabaseStore] Checking Firebase Firestore for persisted data...');
-      const cloudData = await loadDatabaseFromFirestore();
-      if (cloudData && Array.isArray(cloudData.companies) && cloudData.companies.length > 0) {
-        this.data = cloudData;
-        try {
-          fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
-        } catch (e) {
-          console.warn('[DatabaseStore] Could not write cache to disk:', e);
+      const res = await loadDatabaseFromFirestore();
+
+      if (res.status === 'found') {
+        const cloudData = res.data;
+        const cloudCompanies: Company[] = cloudData.companies || [];
+        const localCompanies: Company[] = this.data.companies || [];
+
+        // Safety check: if cloud only has demo company but local disk has real custom companies, keep real data and sync to cloud
+        const isCloudDemoOnly =
+          cloudCompanies.length === 1 && cloudCompanies[0].id === 'comp-demo-1';
+        const isLocalReal = localCompanies.some((c: Company) => c.id !== 'comp-demo-1');
+
+        if (isCloudDemoOnly && isLocalReal) {
+          console.log(
+            '[DatabaseStore] Local database contains real companies while cloud has demo data. Preserving local data and updating Firestore...'
+          );
+          await saveDatabaseToFirestoreNow(this.data);
+        } else {
+          // Restore cloud data
+          this.data = cloudData;
+          try {
+            fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+          } catch (e) {
+            console.warn('[DatabaseStore] Could not write cache to disk:', e);
+          }
+          console.log(
+            `[DatabaseStore] Restored from Firebase Firestore! Loaded ${cloudCompanies.length} companies, ${cloudData.players?.length || 0} players, ${cloudData.users?.length || 0} users.`
+          );
         }
-        console.log(`[DatabaseStore] Restored from Firebase Firestore! Loaded ${cloudData.companies.length} companies, ${cloudData.players?.length || 0} players, ${cloudData.users?.length || 0} users.`);
-      } else {
-        console.log('[DatabaseStore] No prior Firestore data found or fresh installation. Uploading current database to Firestore...');
+      } else if (res.status === 'not_found') {
+        console.log('[DatabaseStore] No prior Firestore document found. Initializing Firestore with current database...');
         await saveDatabaseToFirestoreNow(this.data);
+      } else if (res.status === 'error') {
+        console.error('[DatabaseStore] Network or auth error reading Firestore. Retaining local data without cloud overwrite.');
+      } else if (res.status === 'unconfigured') {
+        console.warn('[DatabaseStore] Firestore credentials not provided. Running in local-disk mode only.');
       }
     } catch (err) {
       console.warn('[DatabaseStore] Initial Firestore sync warning:', err);
+    } finally {
+      // Enable background sync for any future user operations
+      enableFirestoreSync();
     }
   }
 
   public async syncToFirestoreNow(): Promise<boolean> {
     return await saveDatabaseToFirestoreNow(this.data);
+  }
+
+  public importBackup(newData: any): boolean {
+    if (!newData || !Array.isArray(newData.users) || !newData.users.some((u: any) => u.role === 'admin')) {
+      throw new Error('Arquivo de backup inválido: usuário administrador ausente ou corrompido.');
+    }
+    this.data = newData;
+    this.save();
+    return true;
   }
 
   public getFirestoreStatus() {

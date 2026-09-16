@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Building2,
   Layers,
@@ -31,6 +31,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { Company, Plan, AdminStats, MediaIntegrityAuditReport } from '../types';
@@ -309,6 +311,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       showToast('error', err.message || 'Falha ao sincronizar com Firebase Firestore.');
     } finally {
       setIsSyncingFirestore(false);
+    }
+  };
+
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportBackup = () => {
+    api.exportBackup();
+    showToast('success', 'Download do arquivo de backup JSON iniciado!');
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingBackup(true);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const res = await api.importBackup(parsed);
+      showToast('success', res.message || 'Backup restaurado com sucesso e salvo na nuvem!');
+      await loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao importar arquivo de backup JSON.');
+    } finally {
+      setIsImportingBackup(false);
+      if (backupFileInputRef.current) {
+        backupFileInputRef.current.value = '';
+      }
     }
   };
 
@@ -905,6 +936,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
                   )}
                   <span>Sincronizar Firestore</span>
+                </button>
+
+                {/* Backup JSON Download e Restauração */}
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition cursor-pointer"
+                  title="Baixa uma cópia completa de segurança em arquivo JSON para o seu computador"
+                >
+                  <Download className="h-3.5 w-3.5 text-blue-400" />
+                  <span>Baixar Backup</span>
+                </button>
+
+                <input
+                  type="file"
+                  ref={backupFileInputRef}
+                  onChange={handleImportBackup}
+                  accept=".json"
+                  className="hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => backupFileInputRef.current?.click()}
+                  disabled={isImportingBackup}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition cursor-pointer disabled:opacity-50"
+                  title="Restaura os dados a partir de um arquivo JSON de backup e salva no Firestore"
+                >
+                  {isImportingBackup ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5 text-purple-400" />
+                  )}
+                  <span>Restaurar Backup</span>
                 </button>
               </div>
             </div>

@@ -33,7 +33,12 @@ Se preferir criar o serviço manualmente no Render:
 
 ---
 
-### Notas sobre Armazenamento e Uploads:
-- O sistema armazena os dados em `data/indoor_media.json` e arquivos enviados em `uploads/`.
-- No plano gratuito do Render, o sistema de arquivos reinicia a cada novo deploy. As contas e planos padrão são recriados automaticamente na primeira inicialização.
-- Para manter fotos e mídias salvas permanentemente mesmo após novos deploys no Render, você pode opcionalmente adicionar um **Disk** (Persistent Disk) apontando para `/uploads` e `/data` nas configurações do serviço.
+### Persistência de Dados e Banco de Dados (Firebase Firestore):
+- **O Banco de Dados é 100% persistente na nuvem**: Todas as empresas, usuários, operadores, senhas, telas (players), playlists e programações são sincronizados automaticamente em tempo real com o **Firebase Firestore**.
+- **Segurança contra novos deploys e reinicializações**: O arquivo `firebase-applet-config.json` já está incluído na raiz do projeto. Mesmo que o Render durma ou seja feito um novo deploy (que limpa o disco temporário do plano Free), ao inicializar o servidor restaura automaticamente todos os dados salvos do Firestore!
+- **Variáveis de Ambiente (Opcional caso não queira subir o json para o git público)**:
+  - Se preferir adicionar via variáveis de ambiente no painel do Render, você pode definir:
+    - `FIREBASE_PROJECT_ID`: `gen-lang-client-0937994667`
+    - `FIREBASE_API_KEY`: sua chave de API do Firebase
+    - `FIRESTORE_DATABASE_ID`: `ai-studio-mdiaindoor-0ee6f26d-4225-42ad-910a-5d51615f2900`
+- **Mídias e Arquivos**: As mídias podem ser vinculadas diretamente pelo **Google Drive** de cada empresa (armazena os vídeos e imagens no Google Drive sem consumir disco do Render) ou via uploads locais. Caso utilize uploads locais no plano gratuito do Render, recomenda-se adicionar um **Persistent Disk** para a pasta `/uploads`.

@@ -348,6 +348,32 @@ apiRouter.post('/admin/firestore/sync', requireAuth, requireRole('admin'), async
   }
 });
 
+apiRouter.get('/admin/backup/export', requireAuth, requireRole('admin'), (_req, res) => {
+  try {
+    const data = db.getData();
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="indoor_media_backup_${dateStr}.json"`);
+    res.send(JSON.stringify(data, null, 2));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Erro ao exportar backup' });
+  }
+});
+
+apiRouter.post('/admin/backup/import', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { backup } = req.body;
+    if (!backup) {
+      return res.status(400).json({ error: 'Conteúdo do backup não fornecido.' });
+    }
+    const parsed = typeof backup === 'string' ? JSON.parse(backup) : backup;
+    db.importBackup(parsed);
+    res.json({ success: true, message: 'Backup restaurado com sucesso e sincronizado com o Firestore.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Falha ao restaurar backup.' });
+  }
+});
+
 apiRouter.get('/admin/companies', requireAuth, requireRole('admin'), (_req, res) => {
   const data = db.getData();
   const result = data.companies.map((c) => {
