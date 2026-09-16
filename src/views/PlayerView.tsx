@@ -68,6 +68,17 @@ interface ActiveCall {
   timestamp: number;
 }
 
+function resolveMediaUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (url.includes('drive.google.com')) {
+    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
+    }
+  }
+  return url;
+}
+
 export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCode, overridePlayerToken }) => {
   const [data, setData] = useState<CurrentPlayerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -675,7 +686,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
             <video
               ref={videoRef}
               key={currentMedia.id + currentIndex}
-              src={currentMedia.file_url}
+              src={resolveMediaUrl(currentMedia.file_url)}
               autoPlay
               muted
               playsInline
@@ -693,7 +704,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           ) : (
             <img
               key={currentMedia?.id + currentIndex}
-              src={currentMedia?.file_url}
+              src={resolveMediaUrl(currentMedia?.file_url)}
               alt={currentMedia?.name}
               referrerPolicy="no-referrer"
               onError={(e) => {

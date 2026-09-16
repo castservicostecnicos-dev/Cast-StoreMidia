@@ -256,3 +256,43 @@ export interface DriveSettings {
   root_folder_url?: string;
   last_synced_at?: string;
 }
+
+export interface MediaIntegrityItemResult {
+  media_id: string;
+  name: string;
+  type: string;
+  file_url: string;
+  source: 'google_drive' | 'local' | 'rss' | 'weather_clock' | 'external';
+  drive_file_id?: string;
+  healthy: boolean;
+  status: 'ok' | 'trashed' | 'not_found' | 'permission_denied' | 'network_error' | 'inaccessible';
+  message: string;
+  file_size?: number;
+  mime_type?: string;
+  playlists_affected: string[];
+  players_affected: {
+    id: string;
+    name: string;
+    code: string;
+    location?: string;
+    is_online?: boolean;
+  }[];
+}
+
+export interface MediaIntegrityAuditReport {
+  company_id?: string;
+  checked_at: string;
+  summary: {
+    total: number;
+    healthy: number;
+    inaccessible: number;
+    google_drive_count: number;
+    local_count: number;
+    rss_count: number;
+    widget_count: number;
+  };
+  has_issues: boolean;
+  issues: MediaIntegrityItemResult[];
+  items: MediaIntegrityItemResult[];
+}
+

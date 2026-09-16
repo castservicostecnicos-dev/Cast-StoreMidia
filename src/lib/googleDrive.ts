@@ -44,6 +44,7 @@ export interface DriveUploadResult {
   mimeType: string;
   webViewLink: string;
   webContentLink?: string;
+  directStreamLink?: string;
   size?: number;
 }
 
@@ -336,14 +337,55 @@ export const uploadFileToDrive = async (
   }
 
   const data = await res.json();
+
+  // Set file as public reader so screens and TVs can display it directly
+  await makeDriveFilePublic(accessToken, data.id).catch(() => {});
+
+  const directStreamLink = getDriveDirectStreamUrl(data.id);
+
   return {
     id: data.id,
     name: data.name,
     mimeType: data.mimeType,
     webViewLink: data.webViewLink,
     webContentLink: data.webContentLink,
+    directStreamLink,
     size: data.size ? Number(data.size) : undefined,
   };
+};
+
+/**
+ * Returns direct streaming URL for Google Drive media files
+ */
+export const getDriveDirectStreamUrl = (fileId: string): string => {
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
+};
+
+/**
+ * Makes a Google Drive file accessible with public view permissions
+ */
+export const makeDriveFilePublic = async (
+  accessToken: string,
+  fileId: string
+): Promise<boolean> => {
+  try {
+    const url = `${DRIVE_API_BASE}/${fileId}/permissions`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'reader',
+        type: 'anyone',
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Google Drive] Could not set public permission:', err);
+    return false;
+  }
 };
 
 /**
@@ -399,3 +441,91 @@ export const deleteDriveFile = async (
 
   return true;
 };
+
+/**
+ * Extracts Google Drive File ID from URL
+ */
+export const extractDriveFileId = (url: string | undefined): string | null => {
+  if (!url) return null;
+  const lh3Match = url.match(/googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+  if (lh3Match && lh3Match[1]) return lh3Match[1];
+
+  const driveFileMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveFileMatch && driveFileMatch[1]) return driveFileMatch[1];
+
+  const idParamMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParamMatch && idParamMatch[1]) return idParamMatch[1];
+
+  return null;
+};
+
+/**
+ * Checks a specific file in Google Drive to verify if it is active, trashed or missing
+ */
+export const verifyDriveFileStatus = async (
+  accessToken: string,
+  fileId: string
+): Promise<{
+  accessible: boolean;
+  status: 'ok' | 'trashed' | 'not_found' | 'permission_denied' | 'error';
+  name?: string;
+  size?: number;
+  message: string;
+}> => {
+  try {
+    const url = `${DRIVE_API_BASE}/${fileId}?fields=id,name,trashed,size,mimeType,shared`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.trashed) {
+        return {
+          accessible: false,
+          status: 'trashed',
+          name: data.name,
+          message: 'Arquivo foi movido para a Lixeira do Google Drive.',
+        };
+      }
+      return {
+        accessible: true,
+        status: 'ok',
+        name: data.name,
+        size: data.size ? Number(data.size) : undefined,
+        message: 'Arquivo ativo e íntegro no Google Drive.',
+      };
+    }
+
+    if (res.status === 404) {
+      return {
+        accessible: false,
+        status: 'not_found',
+        message: 'Arquivo não encontrado ou excluído do Google Drive.',
+      };
+    }
+
+    if (res.status === 403) {
+      return {
+        accessible: false,
+        status: 'permission_denied',
+        message: 'Acesso negado: permissões insuficientes ou link revogado no Google Drive.',
+      };
+    }
+
+    return {
+      accessible: false,
+      status: 'error',
+      message: `Google Drive respondeu com status ${res.status}.`,
+    };
+  } catch (err: any) {
+    return {
+      accessible: false,
+      status: 'error',
+      message: err.message || 'Erro ao conectar com Google Drive.',
+    };
+  }
+};
+

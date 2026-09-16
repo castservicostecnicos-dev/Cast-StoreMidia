@@ -1,4 +1,4 @@
-import { Role, User, Company, Plan, Player, Operator, Playlist, Media, RssFeed, RssPreset, RssArticle, CallPhrase, PlayerCall, AdminStats, CompanyStats, WeatherData } from '../types';
+import { Role, User, Company, Plan, Player, Operator, Playlist, Media, RssFeed, RssPreset, RssArticle, CallPhrase, PlayerCall, AdminStats, CompanyStats, WeatherData, MediaIntegrityAuditReport } from '../types';
 
 const TOKEN_KEY = 'indoor_media_token';
 
@@ -64,6 +64,25 @@ export const api = {
 
   // Admin
   getAdminStats: () => request<AdminStats>('/admin/stats'),
+  getFirestoreStatus: () =>
+    request<{
+      configured: boolean;
+      provider: string;
+      lastSyncTimestamp: string | null;
+      lastSyncError: string | null;
+      isSyncing: boolean;
+    }>('/admin/firestore/status'),
+  syncFirestore: () =>
+    request<{
+      success: boolean;
+      status: {
+        configured: boolean;
+        provider: string;
+        lastSyncTimestamp: string | null;
+        lastSyncError: string | null;
+        isSyncing: boolean;
+      };
+    }>('/admin/firestore/sync', { method: 'POST' }),
   getCompanies: () => request<Company[]>('/admin/companies'),
   createCompany: (data: Partial<Company> & { password?: string }) =>
     request<Company>('/admin/companies', { method: 'POST', body: JSON.stringify(data) }),
@@ -158,6 +177,19 @@ export const api = {
     request<{ message: string }>(`/company/playlists/${id}`, { method: 'DELETE' }),
 
   getCompanyMedia: () => request<Media[]>('/company/media'),
+  checkMediaIntegrity: (driveAccessToken?: string) =>
+    request<MediaIntegrityAuditReport>('/company/media/check-integrity', {
+      method: 'POST',
+      body: JSON.stringify({ driveAccessToken }),
+    }),
+  getMediaIntegrityStatus: () => request<MediaIntegrityAuditReport>('/company/media/integrity-status'),
+  checkAdminMediaIntegrity: (params?: { companyId?: string; driveAccessToken?: string }) =>
+    request<MediaIntegrityAuditReport>('/admin/media/check-integrity', {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
+    }),
+  getAdminMediaIntegrityStatus: (companyId?: string) =>
+    request<MediaIntegrityAuditReport>(`/admin/media/integrity-status${companyId ? `?companyId=${companyId}` : ''}`),
   uploadFile: (fileData: string, filename: string, mimeType?: string) =>
     request<{ url: string; filename: string; originalName: string; size: number; mimeType: string }>('/upload', {
       method: 'POST',

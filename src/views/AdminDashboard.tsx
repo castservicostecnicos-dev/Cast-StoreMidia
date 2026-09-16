@@ -25,9 +25,15 @@ import {
   Trash2,
   Loader2,
   AlertCircle,
+  Database,
+  RefreshCw,
+  CheckCircle2,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { Company, Plan, AdminStats } from '../types';
+import { Company, Plan, AdminStats, MediaIntegrityAuditReport } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
 
@@ -196,6 +202,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Copied Key State for visual feedback
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Firebase Firestore Persistence State
+  const [firestoreStatus, setFirestoreStatus] = useState<{
+    configured: boolean;
+    provider: string;
+    lastSyncTimestamp: string | null;
+    lastSyncError: string | null;
+    isSyncing: boolean;
+  } | null>(null);
+  const [isSyncingFirestore, setIsSyncingFirestore] = useState(false);
+
+  // Global Media Integrity State
+  const [adminIntegrityReport, setAdminIntegrityReport] = useState<MediaIntegrityAuditReport | null>(null);
+  const [isAuditingMedia, setIsAuditingMedia] = useState(false);
+  const [showIntegrityReportModal, setShowIntegrityReportModal] = useState(false);
+
+  const handleAuditAdminMedia = async () => {
+    setIsAuditingMedia(true);
+    try {
+      const report = await api.checkAdminMediaIntegrity();
+      setAdminIntegrityReport(report);
+      setShowIntegrityReportModal(true);
+      if (report.has_issues) {
+        showToast('error', `Atenção: ${report.issues.length} mídia(s) inacessível(is) no Google Drive ou servidor encontradas!`);
+      } else {
+        showToast('success', `Todas as ${report.summary.total} mídias de todas as empresas estão íntegras e acessíveis!`);
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao auditar integridade das mídias.');
+    } finally {
+      setIsAuditingMedia(false);
+    }
+  };
+
   const handleCopyText = (text: string, key: string, label: string) => {
     try {
       if (navigator?.clipboard?.writeText) {
@@ -212,18 +251,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadData = async () => {
     try {
       setLoading(true);
-      const [s, c, p] = await Promise.all([
+      const [s, c, p, fsStatus] = await Promise.all([
         api.getAdminStats(),
         api.getCompanies(),
         api.getPlans(),
+        api.getFirestoreStatus().catch(() => null),
       ]);
       setStats(s);
       setCompanies(c);
       setPlans(p);
+      if (fsStatus) setFirestoreStatus(fsStatus);
     } catch (err: any) {
       showToast('error', err.message || 'Erro ao carregar dados do painel.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncFirestore = async () => {
+    setIsSyncingFirestore(true);
+    try {
+      const res = await api.syncFirestore();
+      setFirestoreStatus(res.status);
+      showToast('success', 'Banco de dados sincronizado com Firebase Firestore com sucesso!');
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao sincronizar com Firebase Firestore.');
+    } finally {
+      setIsSyncingFirestore(false);
     }
   };
 
@@ -731,6 +785,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span>Carregar Dados de Teste</span>
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+
+            {/* Status de Armazenamento & Persistência na Nuvem */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 p-3.5 rounded-xl bg-slate-900/90 border border-slate-700/80">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-white">Banco de Dados: Firebase Firestore</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      Persistência Cloud Ativa
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Todos os cadastros e dados são salvos no Firebase e protegidos contra perdas em deploys no Render.
+                    {firestoreStatus?.lastSyncTimestamp && (
+                      <span className="ml-1.5 text-slate-500">
+                        (Última sincronização: {new Date(firestoreStatus.lastSyncTimestamp).toLocaleTimeString()})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+                <button
+                  id="btn-admin-audit-media"
+                  type="button"
+                  onClick={handleAuditAdminMedia}
+                  disabled={isAuditingMedia}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition cursor-pointer disabled:opacity-50"
+                  title="Audita integridade de todos os arquivos no Google Drive e mídias no Firebase"
+                >
+                  {isAuditingMedia ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                  ) : (
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                  )}
+                  <span>Auditar Mídias (Drive)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSyncFirestore}
+                  disabled={isSyncingFirestore}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition cursor-pointer disabled:opacity-50"
+                  title="Garante que todos os dados locais estejam salvos no Firebase Firestore"
+                >
+                  {isSyncingFirestore ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-400" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
+                  )}
+                  <span>Sincronizar Firestore</span>
                 </button>
               </div>
             </div>
@@ -2185,6 +2298,143 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RELATÓRIO DE AUDITORIA DE MÍDIAS / DRIVE */}
+      {showIntegrityReportModal && adminIntegrityReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`rounded-xl p-2.5 ${
+                    adminIntegrityReport.has_issues
+                      ? 'bg-rose-950/80 text-rose-400 border border-rose-700'
+                      : 'bg-emerald-950/80 text-emerald-400 border border-emerald-700'
+                  }`}
+                >
+                  {adminIntegrityReport.has_issues ? (
+                    <ShieldAlert className="h-6 w-6" />
+                  ) : (
+                    <ShieldCheck className="h-6 w-6" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Auditoria de Integridade de Mídias & Google Drive
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Verificação cruzada entre banco Firebase Firestore, Google Drive e URLs de mídia
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIntegrityReportModal(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* SUMMARY STATS */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+              <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Mídias</span>
+                <span className="text-xl font-bold text-white">{adminIntegrityReport.summary.total}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700">
+                <span className="text-[10px] uppercase font-bold text-emerald-400 block">Íntegras & Acessíveis</span>
+                <span className="text-xl font-bold text-emerald-400">{adminIntegrityReport.summary.healthy}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700">
+                <span className="text-[10px] uppercase font-bold text-rose-400 block">Inacessíveis / Falha</span>
+                <span className="text-xl font-bold text-rose-400">{adminIntegrityReport.summary.inaccessible}</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700">
+                <span className="text-[10px] uppercase font-bold text-blue-400 block">Google Drive</span>
+                <span className="text-xl font-bold text-blue-400">{adminIntegrityReport.summary.google_drive_count}</span>
+              </div>
+            </div>
+
+            {/* STATUS MESSAGE */}
+            <div
+              className={`p-3 rounded-xl border text-xs mb-4 ${
+                adminIntegrityReport.has_issues
+                  ? 'bg-rose-950/30 border-rose-800/60 text-rose-200'
+                  : 'bg-emerald-950/20 border-emerald-800/50 text-emerald-200'
+              }`}
+            >
+              {adminIntegrityReport.has_issues
+                ? `Atenção: ${adminIntegrityReport.issues.length} mídia(s) cadastrada(s) no Firebase não puderam ser acessadas no Google Drive ou servidor. Mídias problemáticas podem causar tela preta nos terminais.`
+                : 'Excelente! Todos os arquivos cadastrados no Firebase Firestore estão acessíveis no Google Drive e prontos para transmissão contínua 24/7.'}
+            </div>
+
+            {/* ISSUES LIST OR ITEMS LIST */}
+            <div className="overflow-y-auto flex-1 space-y-2.5 pr-1">
+              {adminIntegrityReport.issues.length > 0 ? (
+                adminIntegrityReport.issues.map((issue) => (
+                  <div
+                    key={issue.media_id}
+                    className="p-3 rounded-xl border border-rose-800/60 bg-slate-800/80 flex flex-col justify-between gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-white block">{issue.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Origem: {issue.source === 'google_drive' ? 'Google Drive' : issue.source}
+                        </span>
+                      </div>
+                      <span className="rounded bg-rose-900 border border-rose-700 px-2 py-0.5 text-[9px] font-bold uppercase text-rose-200">
+                        {issue.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-300 font-medium">{issue.message}</p>
+                    {(issue.playlists_affected.length > 0 || issue.players_affected.length > 0) && (
+                      <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-700/60">
+                        {issue.playlists_affected.length > 0 && (
+                          <p>Playlists: <span className="text-slate-200">{issue.playlists_affected.join(', ')}</span></p>
+                        )}
+                        {issue.players_affected.length > 0 && (
+                          <p>Telas: <span className="text-amber-400">{issue.players_affected.map((p) => p.name || p.code).join(', ')}</span></p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-slate-400">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-2 opacity-80" />
+                  <p className="text-xs font-semibold text-slate-300">Nenhum problema de integridade detectado.</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Todas as mídias no banco de dados estão ativas e acessíveis.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-[10px] text-slate-500 font-mono">
+                Auditado em: {new Date(adminIntegrityReport.checked_at).toLocaleString()}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAuditAdminMedia}
+                  disabled={isAuditingMedia}
+                  className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  Reexecutar Auditoria
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowIntegrityReportModal(false)}
+                  className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

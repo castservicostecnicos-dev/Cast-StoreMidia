@@ -37,9 +37,13 @@ import {
   Link2,
   Copy,
   QrCode,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
+  Database,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument } from '../types';
+import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
 import {
@@ -47,6 +51,7 @@ import {
   uploadFileToDrive,
   getCachedToken,
   requestGoogleLogin,
+  makeDriveFilePublic,
 } from '../lib/googleDrive';
 
 interface CompanyDashboardProps {
@@ -117,6 +122,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     player: null,
   });
   const [copiedPlayerId, setCopiedPlayerId] = useState<string | null>(null);
+
+  // Media Integrity Check State
+  const [integrityReport, setIntegrityReport] = useState<MediaIntegrityAuditReport | null>(null);
+  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
+  const [repairingMediaId, setRepairingMediaId] = useState<string | null>(null);
+  const [showIntegrityDetails, setShowIntegrityDetails] = useState(false);
 
   // Forms
   const [playerForm, setPlayerForm] = useState<{
@@ -267,10 +278,64 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       setPlaylists(py);
       setMediaList(md);
       setRssList(rs);
+
+      // Load cached integrity status if any
+      api.getMediaIntegrityStatus().then((rep) => {
+        if (rep && rep.checked_at) setIntegrityReport(rep);
+      }).catch(() => {});
     } catch (err: any) {
       showToast('error', err.message || 'Erro ao carregar dados da empresa.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRunIntegrityCheck = async () => {
+    setIsCheckingIntegrity(true);
+    try {
+      const driveToken = getCachedToken() || undefined;
+      const report = await api.checkMediaIntegrity(driveToken);
+      setIntegrityReport(report);
+      if (report.has_issues) {
+        showToast(
+          'error',
+          `Alerta: ${report.issues.length} mídia(s) com problema de integridade ou inacessível no Google Drive!`
+        );
+        setShowIntegrityDetails(true);
+      } else {
+        showToast(
+          'success',
+          `Integridade confirmada: todas as ${report.summary.total} mídias estão íntegras e acessíveis!`
+        );
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao verificar integridade das mídias.');
+    } finally {
+      setIsCheckingIntegrity(false);
+    }
+  };
+
+  const handleRepairDrivePermission = async (item: MediaIntegrityItemResult) => {
+    if (!item.drive_file_id) return;
+    const token = getCachedToken();
+    if (!token) {
+      showToast('info', 'Faça login no Google Drive para reparar as permissões do arquivo.');
+      requestGoogleLogin();
+      return;
+    }
+    setRepairingMediaId(item.media_id);
+    try {
+      const ok = await makeDriveFilePublic(token, item.drive_file_id);
+      if (ok) {
+        showToast('success', `Permissão pública concedida para "${item.name}"!`);
+        await handleRunIntegrityCheck();
+      } else {
+        showToast('error', 'Não foi possível definir permissão pública. Verifique se o arquivo ainda existe no Drive.');
+      }
+    } catch (err: any) {
+      showToast('error', err.message || 'Erro ao reparar permissão.');
+    } finally {
+      setRepairingMediaId(null);
     }
   };
 
@@ -1824,30 +1889,226 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       {/* VIEW: MÍDIAS */}
       {activeTab === 'media' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider text-white">Biblioteca de Mídias</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Imagens, Vídeos e Mídia de Clima com Hora Certa</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Arquivos do Google Drive, mídias locais e widgets de clima conectados ao Firebase
+              </p>
             </div>
-            <button
-              onClick={() => {
-                resetMediaModalState();
-                setMediaModalOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
-            >
-              <UploadCloud className="h-4 w-4" />
-              <span>Cadastrar Mídia</span>
-            </button>
+            <div className="flex items-center gap-2.5">
+              <button
+                id="btn-verify-media-integrity"
+                type="button"
+                onClick={handleRunIntegrityCheck}
+                disabled={isCheckingIntegrity}
+                className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-200 shadow-sm hover:bg-slate-700 hover:text-white transition cursor-pointer disabled:opacity-50"
+                title="Verifica se todas as mídias salvas no Firebase ainda existem e estão acessíveis no Google Drive"
+              >
+                <ShieldCheck className={`h-4 w-4 ${isCheckingIntegrity ? 'animate-spin text-blue-400' : 'text-emerald-400'}`} />
+                <span>{isCheckingIntegrity ? 'Auditando...' : 'Verificar Integridade'}</span>
+              </button>
+
+              <button
+                id="btn-open-media-modal"
+                onClick={() => {
+                  resetMediaModalState();
+                  setMediaModalOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
+              >
+                <UploadCloud className="h-4 w-4" />
+                <span>Cadastrar Mídia</span>
+              </button>
+            </div>
           </div>
 
+          {/* INTEGRITY AUDIT BANNER & ALERT REPORT */}
+          {integrityReport && (
+            <div
+              className={`rounded-xl border p-4 transition ${
+                integrityReport.has_issues
+                  ? 'border-rose-700/80 bg-rose-950/30'
+                  : 'border-emerald-800/60 bg-emerald-950/20'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div
+                    className={`rounded-lg p-2 shrink-0 ${
+                      integrityReport.has_issues
+                        ? 'bg-rose-900/60 text-rose-400'
+                        : 'bg-emerald-900/60 text-emerald-400'
+                    }`}
+                  >
+                    {integrityReport.has_issues ? (
+                      <ShieldAlert className="h-5 w-5" />
+                    ) : (
+                      <ShieldCheck className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-white">
+                        {integrityReport.has_issues
+                          ? `Alerta: ${integrityReport.issues.length} mídia(s) com problema de integridade ou inacessível no Google Drive`
+                          : `Integridade 100% Confirmada (${integrityReport.summary.total} mídias auditadas)`}
+                      </h4>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Última checagem: {new Date(integrityReport.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      {integrityReport.has_issues
+                        ? 'Arquivos excluídos ou restritos no Google Drive que podem causar tela preta nos terminais. Corrija abaixo para evitar falhas de exibição.'
+                        : 'Todos os arquivos do Google Drive, URLs locais e widgets sincronizados no Firebase estão acessíveis e prontos para as TVs.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  {integrityReport.has_issues && (
+                    <button
+                      type="button"
+                      onClick={() => setShowIntegrityDetails(!showIntegrityDetails)}
+                      className="rounded-lg border border-rose-700 bg-rose-900/40 px-3 py-1.5 text-xs font-semibold text-rose-200 hover:bg-rose-900/70 transition cursor-pointer"
+                    >
+                      {showIntegrityDetails ? 'Ocultar Detalhes' : `Ver Detalhes (${integrityReport.issues.length})`}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleRunIntegrityCheck}
+                    disabled={isCheckingIntegrity}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isCheckingIntegrity ? 'animate-spin' : ''}`} />
+                    <span>Reverificar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* DETAILED ISSUES BREAKDOWN */}
+              {integrityReport.has_issues && showIntegrityDetails && (
+                <div className="mt-4 pt-4 border-t border-rose-800/40 space-y-3">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-rose-300">
+                    Mídias que requerem atenção:
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {integrityReport.issues.map((issue) => (
+                      <div
+                        key={issue.media_id}
+                        className="rounded-lg border border-rose-800/60 bg-slate-900/80 p-3 flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-xs font-bold text-white block">{issue.name}</span>
+                              <span className="text-[10px] text-slate-400 uppercase font-mono">
+                                Origem: {issue.source === 'google_drive' ? 'Google Drive' : issue.source}
+                              </span>
+                            </div>
+                            <span className="rounded bg-rose-900/80 border border-rose-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-200">
+                              {issue.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-rose-300 mt-1.5 font-medium">{issue.message}</p>
+
+                          {/* Affected Playlists & Screens */}
+                          <div className="mt-2 text-[11px] text-slate-400 space-y-0.5">
+                            {issue.playlists_affected.length > 0 && (
+                              <div>
+                                <span className="text-slate-500 font-medium">Playlists afetadas: </span>
+                                <span className="text-slate-300">{issue.playlists_affected.join(', ')}</span>
+                              </div>
+                            )}
+                            {issue.players_affected.length > 0 && (
+                              <div>
+                                <span className="text-slate-500 font-medium">Telas afetadas: </span>
+                                <span className="text-amber-400 font-semibold">
+                                  {issue.players_affected.map((p) => p.name || p.code).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                          {issue.source === 'google_drive' && issue.status === 'permission_denied' && (
+                            <button
+                              type="button"
+                              onClick={() => handleRepairDrivePermission(issue)}
+                              disabled={repairingMediaId === issue.media_id}
+                              className="flex items-center gap-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold px-2.5 py-1 transition cursor-pointer"
+                            >
+                              <ShieldCheck className="h-3 w-3" />
+                              <span>{repairingMediaId === issue.media_id ? 'Reparando...' : 'Liberar Permissão no Drive'}</span>
+                            </button>
+                          )}
+                          {issue.source === 'google_drive' && issue.drive_file_id && (
+                            <a
+                              href={`https://drive.google.com/file/d/${issue.drive_file_id}/view`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-medium"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              <span>Ver no Drive</span>
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetMedia = mediaList.find((m) => m.id === issue.media_id);
+                              if (targetMedia) handleDeleteMedia(targetMedia);
+                            }}
+                            className="flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 font-medium ml-auto"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Remover Mídia</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {mediaList.map((m) => (
+            {mediaList.map((m) => {
+              const itemIntegrity = integrityReport?.items?.find((it) => it.media_id === m.id);
+              return (
               <div
                 key={m.id}
-                className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800 shadow-sm flex flex-col justify-between"
+                className={`overflow-hidden rounded-xl border bg-slate-800 shadow-sm flex flex-col justify-between transition ${
+                  itemIntegrity && !itemIntegrity.healthy
+                    ? 'border-rose-600 ring-1 ring-rose-500/50'
+                    : 'border-slate-700'
+                }`}
               >
                 <div className="relative aspect-video w-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                  {/* Integrity Badge on Media Card */}
+                  {itemIntegrity && !itemIntegrity.healthy && (
+                    <div
+                      className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-rose-950/90 border border-rose-600 px-2 py-0.5 text-[10px] font-bold text-rose-300 shadow-sm"
+                      title={itemIntegrity.message}
+                    >
+                      <AlertTriangle className="h-3 w-3 text-rose-400 shrink-0" />
+                      <span className="truncate max-w-[120px]">Inacessível no Drive</span>
+                    </div>
+                  )}
+                  {itemIntegrity && itemIntegrity.healthy && itemIntegrity.source === 'google_drive' && (
+                    <div
+                      className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 shadow-sm"
+                      title="Arquivo verificado e acessível no Google Drive"
+                    >
+                      <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
+                      <span>Drive OK</span>
+                    </div>
+                  )}
                   {m.type === 'weather_clock' ? (
                     <div className="h-full w-full bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 p-3 flex flex-col justify-between border-b border-slate-800">
                       <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
@@ -1935,7 +2196,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </div>
       )}

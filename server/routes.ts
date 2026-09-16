@@ -20,8 +20,10 @@ import {
   seedDefaultRssFeedsForCompany,
   DEFAULT_RSS_FEEDS,
   DEFAULT_PLANS,
+  uploadsDir,
 } from './db.js';
 import { realtimeHub } from './realtime.js';
+import { runMediaIntegrityAudit, MediaIntegrityAuditReport } from './mediaIntegrity.js';
 
 export const apiRouter = Router();
 
@@ -329,6 +331,21 @@ apiRouter.get('/admin/stats', requireAuth, requireRole('admin'), (_req, res) => 
     inactiveCompanies,
     totalPlayers,
   });
+});
+
+apiRouter.get('/admin/firestore/status', requireAuth, requireRole('admin'), (_req, res) => {
+  const status = db.getFirestoreStatus();
+  res.json(status);
+});
+
+apiRouter.post('/admin/firestore/sync', requireAuth, requireRole('admin'), async (_req, res) => {
+  try {
+    const success = await db.syncToFirestoreNow();
+    const status = db.getFirestoreStatus();
+    res.json({ success, status });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Erro ao sincronizar com Firestore' });
+  }
 });
 
 apiRouter.get('/admin/companies', requireAuth, requireRole('admin'), (_req, res) => {
@@ -1310,7 +1327,6 @@ apiRouter.post('/upload', requireAuth, (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
 
-    const uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
@@ -1439,6 +1455,89 @@ apiRouter.delete('/company/media/:id', requireAuth, requireRole('company'), (req
   db.persist();
 
   res.json({ message: 'Mídia excluída com sucesso.' });
+});
+
+// Cache for recent integrity check reports
+const integrityReportsCache: Map<string, MediaIntegrityAuditReport> = new Map();
+
+// Verify media integrity against Google Drive and database for Company
+apiRouter.post('/company/media/check-integrity', requireAuth, requireRole('company'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const companyId = req.user!.company_id!;
+    const driveAccessToken = (req.body?.driveAccessToken || req.headers['x-drive-access-token']) as string | undefined;
+
+    const data = db.getData();
+    const companyMedia = data.media.filter((m) => m.company_id === companyId);
+    const companyPlaylists = data.playlists.filter((p) => p.company_id === companyId);
+    const companyPlayers = data.players.filter((p) => p.company_id === companyId);
+
+    const report = await runMediaIntegrityAudit(
+      companyMedia,
+      companyPlaylists,
+      companyPlayers,
+      companyId,
+      driveAccessToken
+    );
+
+    integrityReportsCache.set(`company_${companyId}`, report);
+    res.json(report);
+  } catch (err: any) {
+    console.error('Error verifying media integrity:', err);
+    res.status(500).json({ error: 'Erro ao verificar integridade das mídias: ' + (err.message || 'desconhecido') });
+  }
+});
+
+apiRouter.get('/company/media/integrity-status', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id!;
+  const report = integrityReportsCache.get(`company_${companyId}`);
+  if (report) {
+    return res.json(report);
+  }
+  res.json({ checked_at: null, has_issues: false, summary: null, issues: [], items: [] });
+});
+
+// Verify media integrity for Super Admin (all or specific company)
+apiRouter.post('/admin/media/check-integrity', requireAuth, requireRole('admin'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const targetCompanyId = req.body?.companyId as string | undefined;
+    const driveAccessToken = (req.body?.driveAccessToken || req.headers['x-drive-access-token']) as string | undefined;
+
+    const data = db.getData();
+    const mediaToCheck = targetCompanyId
+      ? data.media.filter((m) => m.company_id === targetCompanyId)
+      : data.media;
+    const playlists = targetCompanyId
+      ? data.playlists.filter((p) => p.company_id === targetCompanyId)
+      : data.playlists;
+    const players = targetCompanyId
+      ? data.players.filter((p) => p.company_id === targetCompanyId)
+      : data.players;
+
+    const report = await runMediaIntegrityAudit(
+      mediaToCheck,
+      playlists,
+      players,
+      targetCompanyId,
+      driveAccessToken
+    );
+
+    const cacheKey = targetCompanyId ? `company_${targetCompanyId}` : 'admin_global';
+    integrityReportsCache.set(cacheKey, report);
+    res.json(report);
+  } catch (err: any) {
+    console.error('Error verifying admin media integrity:', err);
+    res.status(500).json({ error: 'Erro ao auditar mídias do sistema: ' + (err.message || 'desconhecido') });
+  }
+});
+
+apiRouter.get('/admin/media/integrity-status', requireAuth, requireRole('admin'), (req: AuthenticatedRequest, res) => {
+  const targetCompanyId = req.query.companyId as string | undefined;
+  const cacheKey = targetCompanyId ? `company_${targetCompanyId}` : 'admin_global';
+  const report = integrityReportsCache.get(cacheKey);
+  if (report) {
+    return res.json(report);
+  }
+  res.json({ checked_at: null, has_issues: false, summary: null, issues: [], items: [] });
 });
 
 // RSS Management

@@ -1,6 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import {
+  loadDatabaseFromFirestore,
+  saveDatabaseToFirestoreNow,
+  queueFirestoreSync,
+  getFirestoreSyncStatus,
+} from './firestore.js';
 
 export interface User {
   id: string;
@@ -386,8 +392,15 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
   return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(hash, 'hex'));
 }
 
-const dataDir = path.resolve(process.cwd(), 'data');
-const dbPath = path.join(dataDir, 'indoor_media.json');
+export const dataDir = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.resolve(process.cwd(), 'data');
+
+export const dbPath = path.join(dataDir, 'indoor_media.json');
+
+export const uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : (process.env.DATA_DIR ? path.join(dataDir, 'uploads') : path.resolve(process.cwd(), 'uploads'));
 
 class DatabaseStore {
   private data: DatabaseSchema;
@@ -556,6 +569,37 @@ class DatabaseStore {
     } catch (err) {
       console.error('Error saving db file:', err);
     }
+    // Asynchronously synchronize all data to Firebase Firestore
+    queueFirestoreSync(this.data);
+  }
+
+  public async initFromFirestore(): Promise<void> {
+    try {
+      console.log('[DatabaseStore] Checking Firebase Firestore for persisted data...');
+      const cloudData = await loadDatabaseFromFirestore();
+      if (cloudData && Array.isArray(cloudData.companies) && cloudData.companies.length > 0) {
+        this.data = cloudData;
+        try {
+          fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+        } catch (e) {
+          console.warn('[DatabaseStore] Could not write cache to disk:', e);
+        }
+        console.log(`[DatabaseStore] Restored from Firebase Firestore! Loaded ${cloudData.companies.length} companies, ${cloudData.players?.length || 0} players, ${cloudData.users?.length || 0} users.`);
+      } else {
+        console.log('[DatabaseStore] No prior Firestore data found or fresh installation. Uploading current database to Firestore...');
+        await saveDatabaseToFirestoreNow(this.data);
+      }
+    } catch (err) {
+      console.warn('[DatabaseStore] Initial Firestore sync warning:', err);
+    }
+  }
+
+  public async syncToFirestoreNow(): Promise<boolean> {
+    return await saveDatabaseToFirestoreNow(this.data);
+  }
+
+  public getFirestoreStatus() {
+    return getFirestoreSyncStatus();
   }
 
   public getData(): DatabaseSchema {

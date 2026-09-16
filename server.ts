@@ -3,13 +3,20 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/routes.js';
+import { db, uploadsDir } from './server/db.js';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Initialize and restore database from Firebase Firestore
+  try {
+    await db.initFromFirestore();
+  } catch (err) {
+    console.error('[Startup] Failed to restore from Firestore:', err);
+  }
+
   // Serve persistent uploads folder
-  const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
