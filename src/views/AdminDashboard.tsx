@@ -107,6 +107,36 @@ const PLAN_TEMPLATES = [
     monthly_price: 149,
     tag: 'R$ 149 | 12 Telas | 0 Op',
   },
+  {
+    type: 'special',
+    name: 'Especial Sob Medida',
+    description: 'Plano customizado com quantidade de telas e operadores definida livremente para o cliente.',
+    max_players: 2,
+    max_operators: 10,
+    max_storage: 150,
+    monthly_price: 119,
+    tag: 'Sob Medida | 2 Telas | 10 Op',
+  },
+  {
+    type: 'special',
+    name: 'Especial Corporativo',
+    description: 'Plano especial sob medida para médias e grandes empresas com alta demanda de guichês.',
+    max_players: 4,
+    max_operators: 20,
+    max_storage: 250,
+    monthly_price: 189,
+    tag: 'Corporativo | 4 Telas | 20 Op',
+  },
+  {
+    type: 'special',
+    name: 'Especial Grandes Redes',
+    description: 'Operações complexas com múltiplos terminais de exibição e ampla equipe de atendimento.',
+    max_players: 10,
+    max_operators: 50,
+    max_storage: 600,
+    monthly_price: 349,
+    tag: 'Redes | 10 Telas | 50 Op',
+  },
 ];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -198,6 +228,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   });
   const [planWithoutOperator, setPlanWithoutOperator] = useState(false);
   const [autoCalcRatio, setAutoCalcRatio] = useState(true);
+  const [planMode, setPlanMode] = useState<'call' | 'show' | 'special'>('call');
 
   // Copied Key State for visual feedback
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -437,7 +468,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleOpenPlanModal = (plan?: Plan) => {
+  const handleOpenPlanModal = (plan?: Plan, defaultCategory?: 'call' | 'show' | 'special') => {
     setPlanModalError(null);
     if (plan) {
       setEditingPlan(plan);
@@ -450,21 +481,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         monthly_price: plan.monthly_price,
       });
       const isZeroOp = Number(plan.max_operators) === 0;
+      const isCallRatio = !isZeroOp && Number(plan.max_players) > 0 && Number(plan.max_operators) === Number(plan.max_players) * 4;
       setPlanWithoutOperator(isZeroOp);
-      setAutoCalcRatio(!isZeroOp && Number(plan.max_operators) === Number(plan.max_players) * 4);
+      setAutoCalcRatio(isCallRatio);
+      setPlanMode(isZeroOp ? 'show' : isCallRatio ? 'call' : 'special');
     } else {
       setEditingPlan(null);
-      // Default to Call Básico preset (1 tela, 4 operadores)
-      setPlanForm({
-        name: 'Call Básico',
-        description: '1 tela com chamadas no painel e até 4 operadores de atendimento (proporção 4:1).',
-        max_players: 1,
-        max_operators: 4,
-        max_storage: 50,
-        monthly_price: 49,
-      });
-      setPlanWithoutOperator(false);
-      setAutoCalcRatio(true);
+      if (defaultCategory === 'special') {
+        setPlanForm({
+          name: 'Especial Sob Medida',
+          description: 'Plano customizado com quantidade de telas e operadores definida sob medida para o cliente.',
+          max_players: 2,
+          max_operators: 10,
+          max_storage: 150,
+          monthly_price: 119,
+        });
+        setPlanWithoutOperator(false);
+        setAutoCalcRatio(false);
+        setPlanMode('special');
+      } else if (defaultCategory === 'show') {
+        setPlanForm({
+          name: 'Show Básico',
+          description: 'Exibição de mídia indoor, propagandas, hora certa e notícias RSS em até 2 telas (sem operador).',
+          max_players: 2,
+          max_operators: 0,
+          max_storage: 50,
+          monthly_price: 29,
+        });
+        setPlanWithoutOperator(true);
+        setAutoCalcRatio(false);
+        setPlanMode('show');
+      } else {
+        // Default to Call Básico preset (1 tela, 4 operadores)
+        setPlanForm({
+          name: 'Call Básico',
+          description: '1 tela com chamadas no painel e até 4 operadores de atendimento (proporção 4:1).',
+          max_players: 1,
+          max_operators: 4,
+          max_storage: 50,
+          monthly_price: 49,
+        });
+        setPlanWithoutOperator(false);
+        setAutoCalcRatio(true);
+        setPlanMode('call');
+      }
     }
     setPlanModalOpen(true);
   };
@@ -479,6 +539,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       max_storage: tpl.max_storage,
       monthly_price: tpl.monthly_price,
     });
+    setPlanMode(tpl.type as 'call' | 'show' | 'special');
     setPlanWithoutOperator(tpl.type === 'show');
     setAutoCalcRatio(tpl.type === 'call');
     showToast('info', `Modelo "${tpl.name}" carregado com sucesso.`);
@@ -491,7 +552,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const payload = {
       ...planForm,
       max_players: Math.max(1, Number(planForm.max_players) || 1),
-      max_operators: planWithoutOperator ? 0 : Math.max(0, Number(planForm.max_operators) || 0),
+      max_operators: planMode === 'show' || planWithoutOperator ? 0 : Math.max(0, Number(planForm.max_operators) || 0),
       max_storage: Math.max(1, Number(planForm.max_storage) || 1),
       monthly_price: Math.max(0, Number(planForm.monthly_price) || 0),
     };
@@ -1571,81 +1632,111 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* VIEW: PLANOS */}
       {activeTab === 'plans' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white">Planos Comerciais</h3>
-            <button
-              id="btn-novo-plano"
-              onClick={() => handleOpenPlanModal()}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Novo Plano</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Planos Comerciais</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Modelos padrão (Call 4:1 e Show) e Planos Especiais sob medida com quantidade livre de telas e operadores.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-novo-plano-especial"
+                onClick={() => handleOpenPlanModal(undefined, 'special')}
+                className="flex items-center gap-1.5 rounded-lg bg-purple-700/80 hover:bg-purple-600 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition cursor-pointer border border-purple-500/50"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-purple-200" />
+                <span>+ Plano Especial</span>
+              </button>
+              <button
+                id="btn-novo-plano"
+                onClick={() => handleOpenPlanModal()}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-blue-500 transition cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Novo Plano</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((p) => (
-              <div
-                key={p.id}
-                className={`rounded-xl border p-6 bg-slate-800 flex flex-col justify-between shadow-sm ${
-                  p.active ? 'border-slate-700' : 'border-slate-700/50 opacity-60'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-lg font-bold text-white tracking-tight">{p.name}</h4>
-                      {p.max_operators === 0 ? (
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-800">
-                          Show (Sem Op)
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800">
-                          Call (4:1)
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
-                        p.active
-                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
-                          : 'bg-slate-700 text-slate-400 border-slate-600'
-                      }`}
-                    >
-                      {p.active ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-5 min-h-[32px]">{p.description}</p>
+            {plans.map((p) => {
+              const isShow = p.max_operators === 0;
+              const isCall41 = !isShow && p.max_players > 0 && p.max_operators === p.max_players * 4;
+              const isSpecial = !isShow && !isCall41;
 
-                  <div className="space-y-2.5 text-xs text-slate-300 border-t border-slate-700 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Players / Telas:</span>
-                      <strong className="text-white">{p.max_players} {p.max_players === 1 ? 'tela' : 'telas'}</strong>
+              return (
+                <div
+                  key={p.id}
+                  className={`rounded-xl border p-6 bg-slate-800 flex flex-col justify-between shadow-sm ${
+                    p.active ? 'border-slate-700' : 'border-slate-700/50 opacity-60'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-bold text-white tracking-tight">{p.name}</h4>
+                        {isShow ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-950/70 text-amber-300 border border-amber-800">
+                            Show (Sem Op)
+                          </span>
+                        ) : isCall41 ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800">
+                            Call (4:1)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-950/70 text-purple-300 border border-purple-800 flex items-center gap-1">
+                            <Sparkles className="h-2.5 w-2.5 text-purple-300" />
+                            Especial Livre
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
+                          p.active
+                            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                            : 'bg-slate-700 text-slate-400 border-slate-600'
+                        }`}
+                      >
+                        {p.active ? 'Ativo' : 'Inativo'}
+                      </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Operadores:</span>
-                      {p.max_operators === 0 ? (
-                        <span className="text-amber-400 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                          Sem Operador (Mídia/RSS)
-                        </span>
-                      ) : (
-                        <strong className="text-white">
-                          {p.max_operators} operadores {p.max_players > 0 && Math.round(p.max_operators / p.max_players) === 4 ? '(4 por tela)' : ''}
+                    <p className="text-xs text-slate-400 mb-5 min-h-[32px]">{p.description}</p>
+
+                    <div className="space-y-2.5 text-xs text-slate-300 border-t border-slate-700 pt-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Players / Telas:</span>
+                        <strong className="text-white">{p.max_players} {p.max_players === 1 ? 'tela' : 'telas'}</strong>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Limite de Operadores:</span>
+                        {isShow ? (
+                          <span className="text-amber-400 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                            Sem Operador (Mídia/RSS)
+                          </span>
+                        ) : isCall41 ? (
+                          <strong className="text-white">
+                            {p.max_operators} operadores (4 por tela)
+                          </strong>
+                        ) : (
+                          <strong className="text-purple-300 flex items-center gap-1">
+                            <span>{p.max_operators} operadores</span>
+                            <span className="text-[10px] text-purple-400 font-normal">(Livre)</span>
+                          </strong>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Armazenamento / Mídias:</span>
+                        <strong className="text-white">{p.max_storage} arquivos</strong>
+                      </div>
+                      <div className="flex justify-between items-baseline pt-3 border-t border-slate-700">
+                        <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Mensalidade:</span>
+                        <strong className="text-lg text-blue-400 font-bold">
+                          R$ {Number(p.monthly_price).toFixed(2)}<span className="text-xs text-slate-400 font-normal">/mês</span>
                         </strong>
-                      )}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Armazenamento / Mídias:</span>
-                      <strong className="text-white">{p.max_storage} arquivos</strong>
-                    </div>
-                    <div className="flex justify-between items-baseline pt-3 border-t border-slate-700">
-                      <span className="text-slate-400 uppercase text-[10px] font-semibold tracking-wider">Mensalidade:</span>
-                      <strong className="text-lg text-blue-400 font-bold">
-                        R$ {Number(p.monthly_price).toFixed(2)}<span className="text-xs text-slate-400 font-normal">/mês</span>
-                      </strong>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-700 flex items-center justify-end gap-2">
                   <button
@@ -1673,7 +1764,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1882,9 +1974,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {/* SEÇÃO 4: Plano Contratado e Vigência */}
                 <div className="space-y-3 bg-slate-900/40 p-3.5 sm:p-4 rounded-xl border border-slate-700/60">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
-                    4. Plano e Vigência
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-blue-400 block">
+                      4. Plano e Vigência
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPlanModal(undefined, 'special')}
+                      className="text-[10px] font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer underline"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      <span>+ Criar Plano Especial</span>
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
@@ -1897,11 +1999,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                       >
                         <option value="">Selecione um plano...</option>
-                        {plans.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.max_players} {p.max_players === 1 ? 'tela' : 'telas'} | {p.max_operators === 0 ? 'Sem operador' : `${p.max_operators} operadores`})
-                          </option>
-                        ))}
+                        {(() => {
+                          const callPlans = plans.filter((p) => p.max_operators > 0 && p.max_players > 0 && p.max_operators === p.max_players * 4);
+                          const showPlans = plans.filter((p) => p.max_operators === 0);
+                          const specialPlans = plans.filter((p) => p.max_operators > 0 && !(p.max_players > 0 && p.max_operators === p.max_players * 4));
+
+                          return (
+                            <>
+                              {callPlans.length > 0 && (
+                                <optgroup label="Linha Call (Proporção 4:1)">
+                                  {callPlans.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.max_players} {p.max_players === 1 ? 'tela' : 'telas'} | {p.max_operators} operadores)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {showPlans.length > 0 && (
+                                <optgroup label="Linha Show (Sem Operador)">
+                                  {showPlans.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.max_players} {p.max_players === 1 ? 'tela' : 'telas'} | Sem operador)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {specialPlans.length > 0 && (
+                                <optgroup label="Planos Especiais Sob Medida (Livre)">
+                                  {specialPlans.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      ⭐ {p.name} ({p.max_players} {p.max_players === 1 ? 'tela' : 'telas'} | {p.max_operators} operadores)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </>
+                          );
+                        })()}
                       </select>
                     </div>
 
@@ -2022,11 +2156,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">
                       Modelos Rápidos (Clique para preencher)
                     </span>
-                    <span className="text-[9px] text-slate-500 font-mono">Call (4:1) | Show (Sem Op)</span>
+                    <span className="text-[9px] text-slate-500 font-mono">Call (4:1) | Show (0 Op) | Especial (Livre)</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                     {PLAN_TEMPLATES.map((tpl) => {
                       const isSelected = planForm.name.toLowerCase() === tpl.name.toLowerCase();
+                      const isSpecial = tpl.type === 'special';
+                      const isShow = tpl.type === 'show';
                       return (
                         <button
                           key={tpl.name}
@@ -2034,11 +2170,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           onClick={() => handleApplyPlanTemplate(tpl)}
                           className={`px-2.5 py-1.5 rounded-lg text-left border transition text-[11px] cursor-pointer flex flex-col ${
                             isSelected
-                              ? 'border-blue-500 bg-blue-950/60 text-white shadow-sm'
+                              ? isSpecial
+                                ? 'border-purple-500 bg-purple-950/70 text-white shadow-sm ring-1 ring-purple-500/50'
+                                : isShow
+                                ? 'border-amber-500 bg-amber-950/70 text-white shadow-sm ring-1 ring-amber-500/50'
+                                : 'border-blue-500 bg-blue-950/70 text-white shadow-sm ring-1 ring-blue-500/50'
                               : 'border-slate-700/80 bg-slate-800 hover:bg-slate-700/80 text-slate-300'
                           }`}
                         >
-                          <span className="font-bold">{tpl.name}</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold truncate">{tpl.name}</span>
+                            {isSpecial && <Sparkles className="h-3 w-3 text-purple-400 shrink-0" />}
+                          </div>
                           <span className="text-[9px] text-slate-400 font-mono mt-0.5">{tpl.tag}</span>
                         </button>
                       );
@@ -2053,7 +2196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     required
                     value={planForm.name}
                     onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-                    placeholder="Ex: Call Básico ou Show Intermediário"
+                    placeholder="Ex: Call Básico, Show Intermediário ou Especial Sob Medida"
                     className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -2069,59 +2212,105 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
-                {/* Controles de Linha Show (Sem Operador) e Proporção 4:1 (Linha Call) */}
-                <div className="rounded-xl border border-slate-700/80 bg-slate-900/60 p-3 space-y-2.5">
-                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={planWithoutOperator}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setPlanWithoutOperator(checked);
-                        if (checked) {
-                          setPlanForm({ ...planForm, max_operators: 0 });
-                        } else {
-                          const screens = Number(planForm.max_players) || 1;
-                          const calculated = autoCalcRatio ? screens * 4 : 4;
-                          setPlanForm({ ...planForm, max_operators: calculated });
-                        }
-                      }}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-0 focus:ring-offset-0"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-white uppercase tracking-wide">
-                        Plano sem operador (Linha Show - Exibição de Telas/Mídia)
-                      </span>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Para clientes que não vão usar chamadas na tela (pontos exclusivos de mídia indoor, notícias RSS e publicidade).
-                      </p>
-                    </div>
+                {/* Tipo / Modalidade de Plano */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                    Regra de Operadores e Telas *
                   </label>
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlanMode('call');
+                        setPlanWithoutOperator(false);
+                        setAutoCalcRatio(true);
+                        const screens = Number(planForm.max_players) || 1;
+                        setPlanForm({ ...planForm, max_operators: screens * 4 });
+                      }}
+                      className={`py-2 px-2 rounded-lg text-center transition cursor-pointer flex flex-col items-center justify-center ${
+                        planMode === 'call'
+                          ? 'bg-blue-600 text-white font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">Linha Call</span>
+                      <span className="text-[10px] opacity-80">Proporção 4:1</span>
+                    </button>
 
-                  {!planWithoutOperator && (
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none pt-2 border-t border-slate-800">
-                      <input
-                        type="checkbox"
-                        checked={autoCalcRatio}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setAutoCalcRatio(checked);
-                          if (checked) {
-                            const screens = Number(planForm.max_players) || 1;
-                            setPlanForm({ ...planForm, max_operators: screens * 4 });
-                          }
-                        }}
-                        className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-0 focus:ring-offset-0"
-                      />
-                      <div>
-                        <span className="text-xs font-bold text-white uppercase tracking-wide">
-                          Proporção de 4 operadores para cada tela (Padrão Linha Call)
-                        </span>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Calcula automaticamente 4 operadores por tela cadastrada (ex: 1 tela = 4 op, 3 telas = 12 op).
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlanMode('show');
+                        setPlanWithoutOperator(true);
+                        setAutoCalcRatio(false);
+                        setPlanForm({ ...planForm, max_operators: 0 });
+                      }}
+                      className={`py-2 px-2 rounded-lg text-center transition cursor-pointer flex flex-col items-center justify-center ${
+                        planMode === 'show'
+                          ? 'bg-amber-600 text-white font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="text-xs font-bold">Linha Show</span>
+                      <span className="text-[10px] opacity-80">Sem Operador</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlanMode('special');
+                        setPlanWithoutOperator(false);
+                        setAutoCalcRatio(false);
+                      }}
+                      className={`py-2 px-2 rounded-lg text-center transition cursor-pointer flex flex-col items-center justify-center ${
+                        planMode === 'special'
+                          ? 'bg-purple-600 text-white font-bold shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-purple-300" />
+                        <span className="text-xs font-bold">Especial</span>
                       </div>
-                    </label>
+                      <span className="text-[10px] opacity-80">Livre / Sob Medida</span>
+                    </button>
+                  </div>
+
+                  {/* Banner explicativo contextual de cada modo */}
+                  {planMode === 'special' && (
+                    <div className="mt-2 rounded-lg border border-purple-800/80 bg-purple-950/40 p-2.5 flex items-start gap-2 text-purple-200">
+                      <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+                      <div className="text-[11px] leading-tight">
+                        <strong className="block text-purple-300 font-semibold mb-0.5">Plano Especial Sob Medida (Trava 4:1 Liberada):</strong>
+                        Você tem total liberdade para definir qualquer número de telas e operadores (ex: 1 tela e 1 operador, 2 telas e 15 operadores, etc.).
+                      </div>
+                    </div>
+                  )}
+
+                  {planMode === 'call' && (
+                    <div className="mt-2 rounded-lg border border-blue-800/80 bg-blue-950/40 p-2.5 flex items-start justify-between gap-2 text-blue-200">
+                      <div className="text-[11px] leading-tight">
+                        <strong className="block text-blue-300 font-semibold mb-0.5">Padrão Linha Call:</strong>
+                        Calcula automaticamente 4 operadores de guichê por tela de chamada.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlanMode('special');
+                          setAutoCalcRatio(false);
+                        }}
+                        className="text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 underline shrink-0 cursor-pointer"
+                      >
+                        Destravar
+                      </button>
+                    </div>
+                  )}
+
+                  {planMode === 'show' && (
+                    <div className="mt-2 rounded-lg border border-amber-800/80 bg-amber-950/40 p-2.5 text-[11px] text-amber-200 leading-tight">
+                      <strong className="block text-amber-300 font-semibold mb-0.5">Padrão Linha Show:</strong>
+                      Exclusivo para exibição de mídias indoor, notícias RSS e clima (operadores fixados em 0).
+                    </div>
                   )}
                 </div>
 
@@ -2138,7 +2327,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={(e) => {
                         const v = e.target.value;
                         const screens = v === '' ? '' : Math.max(1, Number(v));
-                        if (!planWithoutOperator && autoCalcRatio && typeof screens === 'number') {
+                        if (planMode === 'call' && autoCalcRatio && typeof screens === 'number') {
                           setPlanForm({
                             ...planForm,
                             max_players: screens,
@@ -2154,10 +2343,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Limite de Operadores *
-                    </label>
-                    {planWithoutOperator ? (
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Limite de Operadores *
+                      </label>
+                      {planMode === 'special' && (
+                        <span className="text-[10px] text-purple-400 font-semibold flex items-center gap-0.5">
+                          <Sparkles className="h-2.5 w-2.5" /> Livre
+                        </span>
+                      )}
+                    </div>
+
+                    {planMode === 'show' || planWithoutOperator ? (
                       <div className="w-full rounded-xl border border-amber-800/80 bg-amber-950/40 px-3.5 py-2 text-amber-300 font-semibold text-xs flex items-center justify-between min-h-[44px]">
                         <span>0 operadores</span>
                         <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-900/80 px-1.5 py-0.5 rounded">Sem Chamada</span>
@@ -2168,18 +2365,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           type="number"
                           min={0}
                           required
-                          disabled={autoCalcRatio}
+                          disabled={planMode === 'call' && autoCalcRatio}
                           value={planForm.max_operators}
                           onChange={(e) => {
                             const v = e.target.value;
                             setPlanForm({ ...planForm, max_operators: v === '' ? '' : Math.max(0, Number(v)) });
                           }}
-                          placeholder="Ex: 4"
+                          placeholder="Ex: 10"
                           className={`w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 ${
-                            autoCalcRatio ? 'opacity-90 bg-slate-900/80 cursor-not-allowed text-blue-300 pr-20' : ''
+                            planMode === 'call' && autoCalcRatio
+                              ? 'opacity-90 bg-slate-900/80 cursor-not-allowed text-blue-300 pr-24'
+                              : 'text-white'
                           }`}
                         />
-                        {autoCalcRatio && (
+                        {planMode === 'call' && autoCalcRatio && (
                           <span className="absolute right-2.5 top-2.5 text-[10px] font-mono text-blue-400 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-800">
                             {Number(planForm.max_players) || 1} x 4 = {planForm.max_operators}
                           </span>

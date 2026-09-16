@@ -379,6 +379,18 @@ export const DEFAULT_PLANS: Plan[] = [
     created_at: '2026-09-01T00:00:00.000Z',
     updated_at: '2026-09-05T00:00:00.000Z',
   },
+  {
+    id: 'plan-especial-corp',
+    name: 'Especial Corporativo',
+    description: 'Plano especial sob medida com proporção livre de telas e operadores (ex: 4 telas e 20 operadores de guichê).',
+    max_players: 4,
+    max_operators: 20,
+    max_storage: 250,
+    monthly_price: 189.0,
+    active: true,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-05T00:00:00.000Z',
+  },
 ];
 
 export function hashPassword(password: string, existingSalt?: string): { hash: string; salt: string } {
