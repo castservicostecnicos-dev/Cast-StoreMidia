@@ -15,8 +15,10 @@ import {
   ChevronRight,
   ExternalLink,
   Keyboard,
+  Volume2,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { playCallAlert, unlockAudio } from '../lib/audio';
 import { PlayerDiagnosticView, DiagnosticPlayerData } from '../components/PlayerDiagnosticView';
 
 interface OperatorDashboardProps {
@@ -60,6 +62,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
   const [isPriority, setIsPriority] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(10);
   const [isCalling, setIsCalling] = useState<boolean>(false);
+  const [isPreviewingVoice, setIsPreviewingVoice] = useState<boolean>(false);
   const [lastCallDelivered, setLastCallDelivered] = useState<boolean | null>(null);
   const [lastCallTime, setLastCallTime] = useState<string | null>(null);
 
@@ -435,6 +438,30 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
                 </label>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!callText.trim()) {
+                        showToast('info', 'Digite uma frase para ouvir o teste de voz.');
+                        return;
+                      }
+                      unlockAudio();
+                      setIsPreviewingVoice(true);
+                      playCallAlert(callText.trim(), isPriority, {
+                        onSpeechEnd: () => setIsPreviewingVoice(false),
+                      });
+                    }}
+                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 cursor-pointer ${
+                      isPreviewingVoice
+                        ? 'bg-amber-950/80 border-amber-600 text-amber-300 animate-pulse'
+                        : 'bg-blue-950/70 hover:bg-blue-900/80 border-blue-700/80 text-blue-300 hover:text-white'
+                    }`}
+                    title="Ouvir como o sinal sonoro e a voz sintetizada em português soarão na tela da TV"
+                  >
+                    <Volume2 className={`h-3.5 w-3.5 ${isPreviewingVoice ? 'text-amber-400' : 'text-blue-400'}`} />
+                    <span>{isPreviewingVoice ? 'Ouvindo...' : 'Ouvir Voz'}</span>
+                  </button>
+
                   <span className="inline-flex items-center gap-1 rounded-md bg-blue-950/90 border border-blue-700/80 px-2 py-0.5 text-[11px] font-bold text-blue-300">
                     <Pin className="h-3 w-3 text-blue-400" />
                     Frase Fixa

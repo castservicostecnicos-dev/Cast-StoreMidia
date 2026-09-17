@@ -24,7 +24,7 @@ import {
   Thermometer,
 } from 'lucide-react';
 import { api, getStoredToken } from '../lib/api';
-import { playCallChime } from '../lib/audio';
+import { playCallChime, playCallAlert, stopCallAlert, unlockAudio } from '../lib/audio';
 import { PlayerOrientation, WeatherData } from '../types';
 import { WeatherClockMedia } from '../components/WeatherClockMedia';
 import { RssNewsMedia } from '../components/RssNewsMedia';
@@ -96,8 +96,24 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
   const [currentIndex, setCurrentIndex] = useState(0);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [callRemaining, setCallRemaining] = useState<number>(0);
+  const [isSpeakingCall, setIsSpeakingCall] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(false);
+
+  // Ensure audio and speech synthesis are unlocked on user gesture / interaction
+  useEffect(() => {
+    const handleGesture = () => {
+      unlockAudio();
+    };
+    window.addEventListener('click', handleGesture, { passive: true });
+    window.addEventListener('touchstart', handleGesture, { passive: true });
+    window.addEventListener('keydown', handleGesture, { passive: true });
+    return () => {
+      window.removeEventListener('click', handleGesture);
+      window.removeEventListener('touchstart', handleGesture);
+      window.removeEventListener('keydown', handleGesture);
+    };
+  }, []);
 
   // RSS headlines with instantaneous initial display and offline local cache
   const DEFAULT_HEADLINES = [
@@ -396,8 +412,14 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
     lastCallIdRef.current = callId;
 
     const isPriority = Boolean(callItem.is_priority ?? callItem.isPriority);
-    playCallChime(isPriority);
     const duration = Number(callItem.duration) || 10;
+
+    // Disparar Chime Melódico + Voz Sintetizada (Speech Synthesis em Português)
+    unlockAudio();
+    playCallAlert(phrase, isPriority, {
+      onSpeechStart: () => setIsSpeakingCall(true),
+      onSpeechEnd: () => setIsSpeakingCall(false),
+    });
 
     setActiveCall({
       id: callId,
@@ -528,6 +550,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
       setCallRemaining((prev) => {
         if (prev <= 1) {
           setActiveCall(null);
+          setIsSpeakingCall(false);
+          stopCallAlert();
           return 0;
         }
         return prev - 1;
@@ -772,15 +796,25 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
                 {activeCall.phrase}
               </h1>
 
-              {/* Subtítulo / Localização do Player */}
-              <div className="mt-6 sm:mt-8 flex flex-wrap items-center justify-center gap-3 text-slate-300 text-xs sm:text-base font-semibold">
-                <span className="bg-slate-900/90 px-3 py-1 rounded-md border border-slate-700/80">
-                  {data.player.name}
-                </span>
-                <span>•</span>
-                <span className={activeCall.is_priority ? 'text-amber-400' : 'text-blue-400'}>
-                  {data.player.location || 'Atendimento'}
-                </span>
+              {/* Subtítulo / Localização do Player & Status de Voz */}
+              <div className="mt-6 sm:mt-8 flex flex-col items-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3 text-slate-300 text-xs sm:text-base font-semibold">
+                  <span className="bg-slate-900/90 px-3 py-1 rounded-md border border-slate-700/80">
+                    {data.player.name}
+                  </span>
+                  <span>•</span>
+                  <span className={activeCall.is_priority ? 'text-amber-400' : 'text-blue-400'}>
+                    {data.player.location || 'Atendimento'}
+                  </span>
+                </div>
+
+                {/* Badge Dinâmico de Voz e Chime */}
+                <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 bg-slate-900/90 border border-slate-700/80 text-xs font-semibold shadow-lg">
+                  <Volume2 className={`h-4 w-4 ${isSpeakingCall ? 'text-amber-400 animate-bounce' : 'text-blue-400'}`} />
+                  <span className={isSpeakingCall ? 'text-amber-300 font-bold' : 'text-slate-300'}>
+                    {isSpeakingCall ? 'Voz anunciando frase...' : 'Sinal sonoro & Voz ativados'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -875,14 +909,18 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           <span>{fitMode === 'contain' ? 'Proporção 16:9/9:16' : 'Preencher'}</span>
         </button>
 
-        {/* Teste de áudio */}
+        {/* Teste de áudio e voz sintetizada */}
         <button
           type="button"
-          onClick={() => playCallChime()}
-          className="rounded-lg bg-slate-900/90 p-2 text-slate-300 hover:text-white border border-slate-700/80 shadow-xl cursor-pointer backdrop-blur-sm"
-          title="Testar sinal sonoro de chamada"
+          onClick={() => {
+            unlockAudio();
+            playCallAlert('Dirija-se ao caixa 1', false);
+          }}
+          className="flex items-center gap-1.5 rounded-lg bg-slate-900/90 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 hover:text-white border border-slate-700/80 shadow-xl cursor-pointer backdrop-blur-sm"
+          title="Testar sinal sonoro de chamada e voz sintetizada em português"
         >
-          <Volume2 className="h-4 w-4" />
+          <Volume2 className="h-3.5 w-3.5 text-blue-400" />
+          <span>Testar Som & Voz</span>
         </button>
 
         {/* Tela Cheia */}
