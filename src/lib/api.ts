@@ -183,6 +183,16 @@ export const api = {
     request<{ message: string; active: boolean }>(`/company/playlists/${id}/toggle-status`, { method: 'POST' }),
   deleteCompanyPlaylist: (id: string) =>
     request<{ message: string }>(`/company/playlists/${id}`, { method: 'DELETE' }),
+  addWeatherToPlaylist: (params: { playlist_id?: string; duration?: number }) =>
+    request<{ message: string; playlist: Playlist; item: any }>('/company/weather/add-to-playlist', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
+  addRssToPlaylist: (params: { playlist_id?: string; rss_url: string; name?: string; duration?: number }) =>
+    request<{ message: string; playlist: Playlist; item: any }>('/company/rss/add-to-playlist', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 
   getCompanyMedia: () => request<Media[]>('/company/media'),
   checkMediaIntegrity: (driveAccessToken?: string) =>

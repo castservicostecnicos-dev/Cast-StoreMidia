@@ -196,7 +196,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [companyStatusFilter, setCompanyStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Company Form state
-  const [companyForm, setCompanyForm] = useState({
+  const [companyForm, setCompanyForm] = useState<{
+    legal_name: string;
+    trade_name: string;
+    cnpj: string;
+    email: string;
+    phone: string;
+    responsible: string;
+    address: string;
+    city: string;
+    state: string;
+    plan_id: string;
+    max_players: number | string;
+    max_operators: number | string;
+    start_date: string;
+    due_date: string;
+    password: string;
+  }>({
     legal_name: '',
     trade_name: '',
     cnpj: '',
@@ -207,6 +223,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     city: '',
     state: '',
     plan_id: '',
+    max_players: '',
+    max_operators: '',
     start_date: new Date().toISOString().split('T')[0],
     due_date: '',
     password: '',
@@ -375,6 +393,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         city: company.city || '',
         state: company.state || '',
         plan_id: company.plan_id || (plans[0]?.id || ''),
+        max_players: company.max_players !== undefined && company.max_players !== null ? company.max_players : '',
+        max_operators: company.max_operators !== undefined && company.max_operators !== null ? company.max_operators : '',
         start_date: company.start_date || '',
         due_date: company.due_date || '',
         password: '',
@@ -393,6 +413,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         city: '',
         state: '',
         plan_id: defaultPlan?.id || '',
+        max_players: '',
+        max_operators: '',
         start_date: new Date().toISOString().split('T')[0],
         due_date: '',
         password: '',
@@ -406,11 +428,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setModalError(null);
     setIsSavingCompany(true);
     try {
+      const payload = {
+        ...companyForm,
+        max_players: companyForm.max_players !== '' ? Number(companyForm.max_players) : undefined,
+        max_operators: companyForm.max_operators !== '' ? Number(companyForm.max_operators) : undefined,
+      };
       if (editingCompany) {
-        await api.updateCompany(editingCompany.id, companyForm);
+        await api.updateCompany(editingCompany.id, payload);
         showToast('success', 'Empresa atualizada com sucesso.');
       } else {
-        await api.createCompany(companyForm);
+        await api.createCompany(payload);
         showToast('success', 'Empresa cadastrada com sucesso.');
       }
       setCompanyModalOpen(false);
@@ -1503,6 +1530,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <span className="inline-block rounded-md px-2.5 py-1 bg-blue-900/40 text-blue-300 border border-blue-800 text-[11px] font-bold uppercase tracking-wider">
                       {c.plan_name || 'Plano Padrão'}
                     </span>
+                    {c.is_custom_limits && (
+                      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 bg-purple-950/80 text-purple-300 border border-purple-700/80 text-[10px] font-bold uppercase tracking-wider">
+                        <Sparkles className="h-3 w-3 text-purple-400" />
+                        Sob Medida
+                      </span>
+                    )}
                     <span className="font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-[11px]">
                       {c.cnpj}
                     </span>
@@ -1616,9 +1649,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <p className="text-[11px] text-slate-400">{c.email}</p>
                       </td>
                       <td className="px-5 py-4">
-                        <span className="inline-block rounded px-2 py-0.5 bg-blue-900/40 text-blue-300 border border-blue-800 text-[10px] font-bold tracking-wider uppercase">
-                          {c.plan_name || 'Plano Padrão'}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-block rounded px-2 py-0.5 bg-blue-900/40 text-blue-300 border border-blue-800 text-[10px] font-bold tracking-wider uppercase">
+                            {c.plan_name || 'Plano Padrão'}
+                          </span>
+                          {c.is_custom_limits && (
+                            <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 bg-purple-950/80 text-purple-300 border border-purple-800 text-[9px] font-bold uppercase tracking-wider">
+                              <Sparkles className="h-2.5 w-2.5 text-purple-400" />
+                              Sob Medida
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-slate-300 font-medium">
@@ -2128,6 +2169,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       />
                     </div>
                   </div>
+
+                  {/* LIMITES ESPECIAIS SOB MEDIDA (TRAVA DE 4 OPERADORES LIBERADA) */}
+                  <div className="mt-3.5 p-3 sm:p-3.5 rounded-xl border border-purple-800/60 bg-purple-950/20 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-purple-300 font-bold text-xs">
+                        <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                        <span>Definição Livre de Operadores e Telas (Planos Especiais)</span>
+                      </div>
+                      {(companyForm.max_players !== '' || companyForm.max_operators !== '') && (
+                        <button
+                          type="button"
+                          onClick={() => setCompanyForm({ ...companyForm, max_players: '', max_operators: '' })}
+                          className="text-[10px] text-purple-400 hover:text-purple-200 underline cursor-pointer"
+                        >
+                          Usar Padrão do Plano
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Permite definir livremente a quantidade exata de telas e operadores para este cliente (sem a trava fixa de 4 operadores por tela). Deixe em branco caso deseje usar os limites do plano selecionado.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                          Qtd. Telas / Players (Livre)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={companyForm.max_players}
+                          onChange={(e) => setCompanyForm({ ...companyForm, max_players: e.target.value })}
+                          placeholder={
+                            (() => {
+                              const p = plans.find((pl) => pl.id === companyForm.plan_id);
+                              return p ? `Padrão do plano: ${p.max_players} telas` : 'Ex: 5';
+                            })()
+                          }
+                          className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                          Qtd. Operadores de Chamada (Livre)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={companyForm.max_operators}
+                          onChange={(e) => setCompanyForm({ ...companyForm, max_operators: e.target.value })}
+                          placeholder={
+                            (() => {
+                              const p = plans.find((pl) => pl.id === companyForm.plan_id);
+                              return p ? `Padrão do plano: ${p.max_operators} operadores` : 'Ex: 10';
+                            })()
+                          }
+                          className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* SEÇÃO 5: Senha de Acesso */}
@@ -2412,9 +2514,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Limite de Operadores *
                       </label>
+                      {planMode === 'call' && autoCalcRatio && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAutoCalcRatio(false);
+                            setPlanMode('special');
+                          }}
+                          className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold cursor-pointer underline flex items-center gap-1"
+                        >
+                          <Sparkles className="h-2.5 w-2.5" />
+                          <span>Destravar 4:1 (Livre)</span>
+                        </button>
+                      )}
                       {planMode === 'special' && (
                         <span className="text-[10px] text-purple-400 font-semibold flex items-center gap-0.5">
-                          <Sparkles className="h-2.5 w-2.5" /> Livre
+                          <Sparkles className="h-2.5 w-2.5" /> Livre / Sob Medida
                         </span>
                       )}
                     </div>

@@ -41,11 +41,16 @@ import {
   ShieldAlert,
   AlertTriangle,
   Database,
+  ListPlus,
+  Play,
+  Eye,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
+import { MediaThumbnail } from '../components/MediaThumbnail';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import {
   ensureClientFolders,
   uploadFileToDrive,
@@ -128,6 +133,22 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
   const [repairingMediaId, setRepairingMediaId] = useState<string | null>(null);
   const [showIntegrityDetails, setShowIntegrityDetails] = useState(false);
+
+  // Quick RSS Selection Modal inside Playlist Builder
+  const [rssQuickPickerOpen, setRssQuickPickerOpen] = useState(false);
+
+  // Send RSS/Weather directly to playlist target modal (when user triggers from RSS tab or Playlists tab)
+  const [playlistTargetModal, setPlaylistTargetModal] = useState<{
+    isOpen: boolean;
+    type: 'rss' | 'weather';
+    rssData?: { url: string; name: string };
+  }>({
+    isOpen: false,
+    type: 'rss',
+  });
+
+  // Media Preview Modal (High-definition video/image preview with audio & zoom)
+  const [previewModalMedia, setPreviewModalMedia] = useState<Media | null>(null);
 
   // Forms
   const [playerForm, setPlayerForm] = useState<{
@@ -613,6 +634,120 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     }));
     showToast('success', `Mídia "${media.name}" incluída na playlist.`);
     setMediaPickerModalOpen(false);
+  };
+
+  // Add Weather/Clock directly to the currently open playlist form
+  const handleQuickAddWeatherToPlaylist = () => {
+    let weatherMedia = mediaList.find((m) => m.type === 'weather_clock');
+    if (!weatherMedia) {
+      const tempId = `med-${companyInfo?.id || 'company'}-weather`;
+      weatherMedia = {
+        id: tempId,
+        company_id: companyInfo?.id || '',
+        name: 'Hora Certa & Previsão do Tempo',
+        type: 'weather_clock',
+        file_url: 'widget:weather_clock',
+        duration: 12,
+        active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setMediaList((prev) => [weatherMedia!, ...prev]);
+    }
+
+    setPlaylistForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          media_id: weatherMedia!.id,
+          duration: 12,
+        },
+      ],
+    }));
+    showToast('success', '🌤️ Hora Certa & Previsão do Tempo adicionada à sequência da playlist!');
+  };
+
+  // Add RSS directly to the currently open playlist form
+  const handleQuickAddRssToPlaylist = (rssUrl: string, rssName: string) => {
+    let rssMedia = mediaList.find((m) => m.type === 'rss' && (m.file_url.trim() === rssUrl.trim() || m.name === rssName));
+    if (!rssMedia) {
+      const tempId = `med-${companyInfo?.id || 'company'}-rss-${Date.now()}`;
+      rssMedia = {
+        id: tempId,
+        company_id: companyInfo?.id || '',
+        name: rssName.startsWith('Notícias RSS') ? rssName : `Notícias RSS - ${rssName}`,
+        type: 'rss',
+        file_url: rssUrl,
+        duration: 15,
+        active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setMediaList((prev) => [rssMedia!, ...prev]);
+    }
+
+    setPlaylistForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          media_id: rssMedia!.id,
+          duration: 15,
+        },
+      ],
+    }));
+    setRssQuickPickerOpen(false);
+    showToast('success', `📰 Notícias RSS "${rssName}" adicionadas à playlist!`);
+  };
+
+  // Add RSS feed to a saved playlist from the RSS tab
+  const handleSendRssToPlaylist = async (feedUrl: string, feedName: string, targetPlaylistId?: string) => {
+    if (playlists.length === 0) {
+      showToast('info', 'Você ainda não possui nenhuma playlist. Criando sua primeira playlist...');
+      handleOpenPlaylistModal();
+      return;
+    }
+
+    const playlistId = targetPlaylistId || (playlists.length === 1 ? playlists[0].id : null);
+    if (!playlistId) {
+      setPlaylistTargetModal({
+        isOpen: true,
+        type: 'rss',
+        rssData: { url: feedUrl, name: feedName },
+      });
+      return;
+    }
+
+    const targetPl = playlists.find((p) => p.id === playlistId);
+    try {
+      const res = await api.addRssToPlaylist({
+        playlist_id: playlistId,
+        rss_url: feedUrl,
+        name: feedName.startsWith('Notícias RSS') ? feedName : `Notícias RSS - ${feedName}`,
+        duration: 15,
+      });
+      showToast('success', `📰 Notícias "${feedName}" incluídas na playlist "${targetPl?.name || 'selecionada'}"!`);
+      setPlaylistTargetModal({ isOpen: false, type: 'rss' });
+      loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao incluir canal RSS na playlist.');
+    }
+  };
+
+  // Add Weather to a saved playlist directly from Playlists view
+  const handleSendWeatherToSavedPlaylist = async (playlistId: string) => {
+    try {
+      const targetPl = playlists.find((p) => p.id === playlistId);
+      await api.addWeatherToPlaylist({
+        playlist_id: playlistId,
+        duration: 12,
+      });
+      showToast('success', `🌤️ Hora Certa & Previsão do Tempo incluída na playlist "${targetPl?.name || 'selecionada'}"!`);
+      loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao incluir clima na playlist.');
+    }
   };
 
   const handleTogglePlaylist = async (playlist: Playlist) => {
@@ -1822,10 +1957,48 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">{pl.description || 'Sem descrição'}</p>
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-[11px] text-sky-300 bg-sky-950/70 border border-sky-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
-                          🌤️ Clima: {pl.weather_city || 'São Paulo'}
+                          🌤️ Cidade: {pl.weather_city || 'São Paulo'}
                         </span>
+
+                        {/* Status Clima na grade */}
+                        {pl.items.some((it) => it.type === 'weather_clock' || it.name?.toLowerCase().includes('previsão') || it.name?.toLowerCase().includes('clima')) ? (
+                          <span className="text-[11px] text-amber-300 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
+                            🌤️ Clima & Hora Ativo
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendWeatherToSavedPlaylist(pl.id)}
+                            className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-900/30 hover:bg-amber-900/50 border border-amber-700/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium cursor-pointer transition"
+                            title="Clique para adicionar a tela de Clima e Hora Certa nesta playlist"
+                          >
+                            + 🌤️ Adicionar Clima
+                          </button>
+                        )}
+
+                        {/* Status RSS na grade */}
+                        {pl.items.some((it) => it.type === 'rss' || it.name?.toLowerCase().includes('rss') || it.name?.toLowerCase().includes('notícia')) ? (
+                          <span className="text-[11px] text-rose-300 bg-rose-950/70 border border-rose-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
+                            📰 Notícias RSS Ativas
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlaylistTargetModal({
+                                isOpen: true,
+                                type: 'rss',
+                                rssData: { url: 'https://g1.globo.com/rss/g1/brasil/', name: 'G1 - Notícias Brasil' },
+                              });
+                            }}
+                            className="text-[11px] text-rose-300 hover:text-rose-200 bg-rose-900/30 hover:bg-rose-900/50 border border-rose-700/60 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium cursor-pointer transition"
+                            title="Clique para adicionar canal de notícias RSS em tela cheia"
+                          >
+                            + 📰 Adicionar RSS
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -2109,90 +2282,45 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       <span>Drive OK</span>
                     </div>
                   )}
-                  {m.type === 'weather_clock' ? (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-900 via-blue-950/40 to-slate-900 p-3 flex flex-col justify-between border-b border-slate-800">
-                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-blue-400" />
-                          <span className="text-xs font-mono font-bold text-white">12:30:00</span>
-                        </div>
-                        <span className="text-[9px] font-semibold text-slate-400 uppercase">Hora Certa</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-1.5">
-                          <CloudSun className="h-5 w-5 text-amber-400" />
-                          <div>
-                            <span className="text-sm font-bold text-white block leading-none">24°C</span>
-                            <span className="text-[9px] text-slate-400 leading-none">Previsão</span>
-                          </div>
-                        </div>
-                        <div className="text-right text-[9px] text-slate-400 font-mono">
-                          <span>Máx 28° / Mín 19°</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : m.type === 'rss' ? (
-                    <div className="h-full w-full bg-gradient-to-br from-slate-900 via-rose-950/40 to-slate-900 p-3.5 flex flex-col justify-between border-b border-slate-800">
-                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                        <div className="flex items-center gap-1.5 text-rose-400">
-                          <Newspaper className="h-3.5 w-3.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">Feed RSS</span>
-                        </div>
-                        <span className="text-[9px] font-bold bg-rose-900/60 text-rose-200 px-1.5 py-0.5 rounded border border-rose-700/50">Tela Inteira</span>
-                      </div>
-                      <div className="py-1">
-                        <p className="text-xs font-bold text-white line-clamp-2 leading-tight">
-                          {m.name}
-                        </p>
-                        <span className="text-[9px] text-slate-400 truncate block mt-1 font-mono">{m.file_url}</span>
-                      </div>
-                      <div className="text-[10px] text-rose-300/80 flex items-center gap-1">
-                        <Radio className="h-3 w-3 animate-pulse text-rose-400" />
-                        <span>Manchetes & Fotos Automáticas</span>
-                      </div>
-                    </div>
-                  ) : m.type === 'video' ? (
-                    <video
-                      src={m.file_url}
-                      muted
-                      className="h-full w-full object-cover"
-                      poster=""
-                    />
-                  ) : (
-                    <img
-                      src={m.file_url}
-                      alt={m.name}
-                      referrerPolicy="no-referrer"
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                  <span className={`absolute top-2 right-2 rounded px-2 py-0.5 text-[10px] font-bold text-white uppercase backdrop-blur-xs border ${
-                    m.type === 'weather_clock'
-                      ? 'bg-blue-600/90 border-blue-500 text-white shadow-sm'
-                      : m.type === 'rss'
-                      ? 'bg-rose-600/90 border-rose-500 text-white shadow-sm'
-                      : m.type === 'video'
-                      ? 'bg-purple-600/90 border-purple-500 text-white shadow-sm'
-                      : 'bg-slate-900/90 border-slate-700'
-                  }`}>
-                    {m.type === 'weather_clock' ? 'CLIMA & HORA' : m.type === 'rss' ? 'NOTÍCIA RSS' : m.type}
-                  </span>
+                  
+                  {/* Media Thumbnail Component with Image & Video (MP4/WebM) Previews */}
+                  <MediaThumbnail
+                    media={m}
+                    showBadge={true}
+                    showDuration={false}
+                    showPreviewButton={true}
+                    allowHoverPlay={true}
+                    onPreview={(item) => setPreviewModalMedia(item)}
+                  />
                 </div>
 
                 <div className="p-4">
-                  <h4 className="font-bold text-white text-sm truncate">{m.name}</h4>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                  <h4 className="font-bold text-white text-sm truncate" title={m.name}>{m.name}</h4>
+                  <div className="mt-2.5 flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/60">
                     <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      {m.duration} segundos
+                      {m.duration}s
                     </span>
-                    <button
-                      onClick={() => handleDeleteMedia(m)}
-                      className="text-rose-400 hover:text-rose-300 p-1 rounded-lg hover:bg-slate-700 transition cursor-pointer"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewModalMedia(m)}
+                        className="text-slate-300 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-700 transition cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                        title="Pré-visualizar em alta definição"
+                      >
+                        <Eye className="h-3.5 w-3.5 text-blue-400" />
+                        <span>Ver</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteMedia(m)}
+                        className="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-slate-700 transition cursor-pointer"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2238,6 +2366,34 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </div>
           </div>
 
+          {/* BANNER EXPLICATIVO: COMO INCLUIR RSS NA PLAYLIST */}
+          <div className="rounded-xl border border-rose-500/30 bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0 mt-0.5 sm:mt-0">
+                <Newspaper className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  Como usar Notícias RSS nas suas Telas
+                </h4>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  Os canais RSS ativos abaixo alimentam o <strong>letreiro de rodapé</strong> do player automaticamente. Para exibir as notícias com fotos em <strong>slides de tela cheia</strong> dentro de qualquer playlist, clique no botão <span className="text-rose-300 font-bold bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-800/60">+ Na Playlist</span> de qualquer canal!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('playlists');
+                handleOpenPlaylistModal();
+              }}
+              className="shrink-0 whitespace-nowrap min-h-[38px] px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+            >
+              <ListPlus className="h-4 w-4" />
+              <span>Ver / Criar Playlist</span>
+            </button>
+          </div>
+
           {/* PAINEL DE CANAIS PRONTOS PARA USO */}
           <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -2274,25 +2430,37 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       </p>
                     </div>
 
-                    <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-slate-500 truncate max-w-[170px]">
+                    <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] text-slate-500 truncate max-w-[130px]">
                         {preset.url}
                       </span>
-                      {isAdded ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 shrink-0">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          <span>Cadastrado</span>
-                        </span>
-                      ) : (
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => handleAddPresetRss(preset)}
-                          className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[10px] transition cursor-pointer flex items-center gap-1 shrink-0"
+                          onClick={() => handleSendRssToPlaylist(preset.url, preset.name)}
+                          className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] transition cursor-pointer flex items-center gap-1 shadow-sm"
+                          title="Inserir este canal diretamente na playlist como slide de tela inteira"
                         >
-                          <Plus className="h-3 w-3" />
-                          <span>Adicionar</span>
+                          <ListPlus className="h-3 w-3" />
+                          <span>+ Na Playlist</span>
                         </button>
-                      )}
+                        {isAdded ? (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-400 shrink-0">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Cadastrado</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddPresetRss(preset)}
+                            className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-[10px] transition cursor-pointer flex items-center gap-1"
+                            title="Salvar canal no banco de dados"
+                          >
+                            <Plus className="h-3 w-3" />
+                            <span>Salvar</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -2325,6 +2493,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                   <div className="rounded-lg bg-slate-900/60 p-2.5 border border-slate-700/60 text-xs font-mono text-slate-300 break-all">
                     {r.url}
                   </div>
+
+                  {/* Ação rápida: Inserir na Playlist */}
+                  <button
+                    type="button"
+                    onClick={() => handleSendRssToPlaylist(r.url, r.name)}
+                    className="w-full min-h-[38px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition cursor-pointer shadow-sm"
+                  >
+                    <ListPlus className="h-4 w-4" />
+                    <span>+ Incluir na Playlist como Slide</span>
+                  </button>
 
                   <div className="pt-2 border-t border-slate-700/60 flex items-center gap-2">
                     <button
@@ -2389,7 +2567,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSendRssToPlaylist(r.url, r.name)}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                            title="Inserir este canal RSS como slide de tela inteira na playlist"
+                          >
+                            <ListPlus className="h-3.5 w-3.5" />
+                            <span>+ Na Playlist</span>
+                          </button>
                           <button
                             onClick={() => handleOpenRssModal(r)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer"
@@ -2842,30 +3029,86 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       <label className="font-semibold text-slate-300 block">Itens e Sequência da Grade</label>
                       <span className="text-[11px] text-slate-400">Arraste ou ordene a sequência e defina o tempo de cada tela</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMediaPickerModalOpen(true);
-                      }}
-                      className="min-h-[40px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Incluir Mídia
-                    </button>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleQuickAddWeatherToPlaylist}
+                        className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                        title="Adicionar tela de Clima e Hora Certa"
+                      >
+                        <CloudSun className="h-3.5 w-3.5 text-amber-400" />
+                        <span>+ Clima & Hora</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRssQuickPickerOpen(true)}
+                        className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                        title="Adicionar canal de notícias RSS em tela cheia"
+                      >
+                        <Newspaper className="h-3.5 w-3.5 text-rose-400" />
+                        <span>+ Notícia RSS</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMediaPickerModalOpen(true)}
+                        className="min-h-[36px] px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Mídias</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                     {playlistForm.items.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center bg-slate-900/50 my-2">
-                        <Film className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-                        <p className="text-slate-300 font-semibold text-xs">Nenhuma mídia adicionada nesta playlist</p>
-                        <p className="text-slate-500 text-[11px] mt-1">Clique em "Incluir Mídia" para abrir a biblioteca visual e escolher suas mídias.</p>
-                        <button
-                          type="button"
-                          onClick={() => setMediaPickerModalOpen(true)}
-                          className="mt-3 min-h-[40px] px-3.5 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Escolher Mídias Agora
-                        </button>
+                      <div className="rounded-xl border border-dashed border-slate-700 p-5 bg-slate-900/60 my-2 space-y-3">
+                        <div className="text-center">
+                          <Film className="h-7 w-7 text-slate-500 mx-auto mb-1.5" />
+                          <p className="text-slate-200 font-bold text-xs">Sua playlist está sem mídias na sequência</p>
+                          <p className="text-slate-400 text-[11px]">Escolha abaixo o que deseja exibir nesta tela:</p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleQuickAddWeatherToPlaylist}
+                            className="p-2.5 rounded-xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/40 text-left transition cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <CloudSun className="h-5 w-5 text-amber-400" />
+                              <span className="text-[10px] font-bold text-amber-400 uppercase">+ Adicionar</span>
+                            </div>
+                            <p className="text-xs font-bold text-white group-hover:text-amber-200">Clima & Hora</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Previsão do tempo e relógio sincronizado</p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setRssQuickPickerOpen(true)}
+                            className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-950/30 hover:bg-rose-900/40 text-left transition cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <Newspaper className="h-5 w-5 text-rose-400" />
+                              <span className="text-[10px] font-bold text-rose-400 uppercase">+ Escolher</span>
+                            </div>
+                            <p className="text-xs font-bold text-white group-hover:text-rose-200">Notícias RSS</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Manchetes do G1, UOL e jornais em tela cheia</p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setMediaPickerModalOpen(true)}
+                            className="p-2.5 rounded-xl border border-blue-500/40 bg-blue-950/30 hover:bg-blue-900/40 text-left transition cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <Film className="h-5 w-5 text-blue-400" />
+                              <span className="text-[10px] font-bold text-blue-400 uppercase">+ Abrir</span>
+                            </div>
+                            <p className="text-xs font-bold text-white group-hover:text-blue-200">Biblioteca</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Fotos, vídeos e arquivos institucionais</p>
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       playlistForm.items.map((it, idx) => {
@@ -2878,20 +3121,39 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                             <span className="font-mono text-slate-400 font-bold text-xs w-5 sm:w-6 text-center shrink-0">#{idx + 1}</span>
 
                             {/* Media Thumbnail / Icon */}
-                            <div className="h-10 w-12 sm:w-14 shrink-0 rounded-lg overflow-hidden bg-slate-950 flex items-center justify-center border border-slate-700">
+                            <div
+                              onClick={() => media && setPreviewModalMedia(media)}
+                              className="h-10 w-12 sm:w-14 shrink-0 rounded-lg overflow-hidden bg-slate-950 flex items-center justify-center border border-slate-700 cursor-pointer group hover:border-blue-500 relative transition"
+                              title="Clique para pré-visualizar esta mídia"
+                            >
                               {media?.type === 'weather_clock' ? (
                                 <CloudSun className="h-5 w-5 text-amber-400" />
                               ) : media?.type === 'rss' ? (
                                 <Newspaper className="h-5 w-5 text-rose-400" />
                               ) : media?.type === 'video' ? (
-                                <Film className="h-5 w-5 text-purple-400" />
+                                <>
+                                  <video
+                                    src={media.file_url}
+                                    preload="metadata"
+                                    muted
+                                    className="h-full w-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-blue-600/30 transition">
+                                    <Play className="h-3 w-3 text-white fill-current opacity-90 group-hover:scale-110 transition" />
+                                  </div>
+                                </>
                               ) : media?.file_url ? (
-                                <img
-                                  src={media.file_url}
-                                  alt={media.name}
-                                  referrerPolicy="no-referrer"
-                                  className="h-full w-full object-cover"
-                                />
+                                <>
+                                  <img
+                                    src={media.file_url}
+                                    alt={media.name}
+                                    referrerPolicy="no-referrer"
+                                    className="h-full w-full object-cover group-hover:scale-105 transition"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition opacity-0 group-hover:opacity-100">
+                                    <Eye className="h-3 w-3 text-white" />
+                                  </div>
+                                </>
                               ) : (
                                 <Film className="h-5 w-5 text-slate-500" />
                               )}
@@ -3134,62 +3396,18 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       >
                         {/* Media Visual Preview */}
                         <div className="relative aspect-video w-full bg-slate-950 overflow-hidden flex items-center justify-center">
-                          {m.type === 'weather_clock' ? (
-                            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-blue-950/60 to-slate-900 p-3 flex flex-col justify-between">
-                              <div className="flex items-center justify-between text-blue-400 text-xs">
-                                <span className="font-mono font-bold">12:30:00</span>
-                                <span className="text-[9px] uppercase font-bold tracking-wider">Hora Certa</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <CloudSun className="h-6 w-6 text-amber-400" />
-                                <span className="text-sm font-bold text-white">24°C Clima</span>
-                              </div>
-                            </div>
-                          ) : m.type === 'rss' ? (
-                            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-rose-950/60 to-slate-900 p-3 flex flex-col justify-between">
-                              <div className="flex items-center justify-between text-rose-400 text-xs">
-                                <div className="flex items-center gap-1">
-                                  <Newspaper className="h-3.5 w-3.5" />
-                                  <span className="text-[10px] font-bold uppercase">Notícias RSS</span>
-                                </div>
-                                <span className="text-[9px] bg-rose-900/60 text-rose-200 px-1.5 py-0.5 rounded font-bold">Tela Inteira</span>
-                              </div>
-                              <div className="py-1">
-                                <p className="text-xs font-semibold text-white line-clamp-2 leading-tight">{m.name}</p>
-                              </div>
-                            </div>
-                          ) : m.type === 'video' ? (
-                            <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center text-blue-400">
-                              <Film className="h-8 w-8 mb-1" />
-                              <span className="text-[10px] font-bold text-slate-400">Vídeo</span>
-                            </div>
-                          ) : (
-                            <img
-                              src={m.file_url}
-                              alt={m.name}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                            />
-                          )}
-
-                          {/* Badge tipo */}
-                          <span
-                            className={`absolute top-2 right-2 rounded px-1.5 py-0.5 text-[9px] font-bold text-white uppercase backdrop-blur-xs border ${
-                              m.type === 'rss'
-                                ? 'bg-rose-600/90 border-rose-500'
-                                : m.type === 'weather_clock'
-                                ? 'bg-blue-600/90 border-blue-500'
-                                : m.type === 'video'
-                                ? 'bg-purple-600/90 border-purple-500'
-                                : 'bg-slate-900/90 border-slate-700'
-                            }`}
-                          >
-                            {m.type === 'rss' ? 'RSS' : m.type === 'weather_clock' ? 'CLIMA' : m.type}
-                          </span>
+                          <MediaThumbnail
+                            media={m}
+                            showBadge={true}
+                            showDuration={true}
+                            showPreviewButton={true}
+                            allowHoverPlay={true}
+                            onPreview={(item) => setPreviewModalMedia(item)}
+                          />
 
                           {/* Badge se já está na playlist */}
                           {timesInPlaylist > 0 && (
-                            <span className="absolute bottom-2 left-2 rounded-md bg-emerald-600/90 border border-emerald-500 text-[10px] font-bold text-white px-2 py-0.5 flex items-center gap-1 shadow-md">
+                            <span className="absolute bottom-2 left-2 rounded-md bg-emerald-600/90 border border-emerald-500 text-[10px] font-bold text-white px-2 py-0.5 flex items-center gap-1 shadow-md z-10">
                               <Check className="h-3 w-3" /> Na Playlist ({timesInPlaylist}x)
                             </span>
                           )}
@@ -3197,17 +3415,27 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
                         {/* Body & Actions */}
                         <div className="p-3">
-                          <h4 className="font-bold text-white text-xs truncate group-hover:text-blue-300 transition">
+                          <h4 className="font-bold text-white text-xs truncate group-hover:text-blue-300 transition" title={m.name}>
                             {m.name}
                           </h4>
                           <div className="mt-2 flex items-center justify-between pt-2 border-t border-slate-700/60 text-[11px] text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-slate-500" />
-                              <span>Padrão: {m.duration}s</span>
-                            </span>
                             <button
                               type="button"
-                              className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 transition shadow-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewModalMedia(m);
+                              }}
+                              className="flex items-center gap-1 text-slate-300 hover:text-blue-400 font-semibold transition cursor-pointer"
+                              title="Pré-visualizar em tela cheia com som"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-blue-400" />
+                              <span>Prévia</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSelectMediaForPlaylist(m)}
+                              className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 transition shadow-xs cursor-pointer"
                             >
                               <Plus className="h-3 w-3" /> Escolher
                             </button>
@@ -3711,19 +3939,92 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
               {/* 2. URL EXTERNA */}
               {mediaSourceType === 'url' && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">URL da Mídia (Web) *</label>
-                  <input
-                    type="url"
-                    required
-                    value={mediaForm.file_url}
-                    onChange={(e) => setMediaForm({ ...mediaForm, file_url: e.target.value })}
-                    placeholder="https://exemplo.com/imagem.jpg ou https://exemplo.com/video.mp4"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    Insira o link direto de um vídeo MP4 ou imagem hospedada na web.
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-slate-300">URL da Mídia (Web) *</label>
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setMediaForm((prev) => ({ ...prev, type: 'image' }))}
+                          className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                            mediaForm.type === 'image'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Imagem
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMediaForm((prev) => ({ ...prev, type: 'video' }))}
+                          className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                            mediaForm.type === 'video'
+                              ? 'bg-purple-600 text-white shadow-xs'
+                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Vídeo
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="url"
+                      required
+                      value={mediaForm.file_url}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const isVid = /\.(mp4|webm|mov|ogg)($|\?)/i.test(val);
+                        setMediaForm((prev) => ({
+                          ...prev,
+                          file_url: val,
+                          type: isVid ? 'video' : prev.type || 'image',
+                        }));
+                      }}
+                      placeholder="https://exemplo.com/imagem.jpg ou https://exemplo.com/video.mp4"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-xs"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Insira o link direto de imagens (JPG, PNG, WEBP) ou vídeos (MP4, WebM) hospedados na web.
+                    </p>
+                  </div>
+
+                  {/* LIVE PREVIEW BOX */}
+                  {mediaForm.file_url.trim().length > 8 && (
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/90 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span className="font-semibold text-white flex items-center gap-1.5">
+                          <Eye className="h-3.5 w-3.5 text-blue-400" />
+                          <span>Pré-visualização da URL</span>
+                        </span>
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+                          {mediaForm.type === 'video' ? 'Vídeo Web' : 'Imagem Web'}
+                        </span>
+                      </div>
+                      <div className="relative rounded-lg overflow-hidden bg-black/70 border border-slate-700 flex items-center justify-center max-h-44">
+                        {mediaForm.type === 'video' ? (
+                          <video
+                            src={mediaForm.file_url}
+                            controls
+                            className="w-full max-h-44 object-contain"
+                            onLoadedMetadata={(e) => {
+                              const d = Math.round((e.target as HTMLVideoElement).duration);
+                              if (!isNaN(d) && d > 0 && (!mediaForm.duration || mediaForm.duration === 10)) {
+                                setMediaForm((prev) => ({ ...prev, duration: d }));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src={mediaForm.file_url}
+                            alt="Pré-visualização"
+                            referrerPolicy="no-referrer"
+                            className="w-full max-h-44 object-contain"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -4278,6 +4579,194 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL SELETOR RÁPIDO DE NOTÍCIAS RSS PARA A PLAYLIST */}
+      {rssQuickPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl text-slate-100 flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in slide-in-from-bottom sm:slide-in-from-bottom-0">
+            {/* Header */}
+            <div className="shrink-0 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <Newspaper className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Escolher Notícias RSS</h3>
+                  <p className="text-xs text-slate-400">Selecione o canal para exibir em tela cheia na playlist</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRssQuickPickerOpen(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto space-y-3 text-xs">
+              <p className="text-slate-300 font-semibold">Canais de Notícias Recomendados:</p>
+              <div className="space-y-2">
+                {RSS_PRESETS.map((preset) => (
+                  <div
+                    key={preset.url}
+                    className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 transition"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-bold text-white truncate">{preset.name}</h5>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider bg-slate-900 text-rose-300 border border-rose-900/60 shrink-0">
+                          {preset.category}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{preset.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickAddRssToPlaylist(preset.url, preset.name)}
+                      className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition cursor-pointer shadow-sm"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Inserir</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Se a empresa tiver canais personalizados cadastrados */}
+              {rssList.filter((r) => !RSS_PRESETS.some((p) => p.url === r.url)).length > 0 && (
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <p className="text-slate-300 font-semibold">Seus Canais RSS Personalizados:</p>
+                  {rssList
+                    .filter((r) => !RSS_PRESETS.some((p) => p.url === r.url))
+                    .map((custom) => (
+                      <div
+                        key={custom.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-700/80 bg-slate-800/80 hover:bg-slate-800 transition"
+                      >
+                        <div className="min-w-0">
+                          <h5 className="font-bold text-white truncate">{custom.name}</h5>
+                          <p className="font-mono text-[10px] text-slate-400 truncate mt-0.5">{custom.url}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAddRssToPlaylist(custom.url, custom.name)}
+                          className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition cursor-pointer shadow-sm"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Inserir</span>
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setRssQuickPickerOpen(false)}
+                className="min-h-[40px] px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SELETOR DE PLAYLIST DE DESTINO (DISPARADO PELA ABA RSS) */}
+      {playlistTargetModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl text-slate-100 flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-in slide-in-from-bottom sm:slide-in-from-bottom-0">
+            <div className="shrink-0 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <ListPlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Adicionar à Playlist</h3>
+                  <p className="text-xs text-slate-400">Escolha em qual playlist incluir o conteúdo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlaylistTargetModal({ isOpen: false, type: 'rss' })}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3 rounded-lg bg-slate-800/80 border border-slate-700/80">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
+                  Conteúdo Selecionado
+                </span>
+                <p className="text-white font-bold text-sm">
+                  {playlistTargetModal.rssData?.name || 'Canal RSS'}
+                </p>
+                <p className="font-mono text-[10px] text-slate-400 truncate mt-0.5">
+                  {playlistTargetModal.rssData?.url}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-semibold text-slate-300 block">Selecione a Playlist de destino:</label>
+                {playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    type="button"
+                    onClick={() => {
+                      if (playlistTargetModal.rssData) {
+                        handleSendRssToPlaylist(
+                          playlistTargetModal.rssData.url,
+                          playlistTargetModal.rssData.name,
+                          pl.id
+                        );
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 hover:border-blue-500 transition text-left cursor-pointer group"
+                  >
+                    <div>
+                      <h4 className="font-bold text-white text-xs group-hover:text-blue-300">{pl.name}</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{pl.items?.length || 0} itens na grade</p>
+                    </div>
+                    <span className="text-xs font-bold text-blue-400 group-hover:translate-x-0.5 transition flex items-center gap-1">
+                      <span>Inserir</span>
+                      <Plus className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setPlaylistTargetModal({ isOpen: false, type: 'rss' })}
+                className="min-h-[40px] px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PRÉ-VISUALIZAÇÃO COMPLETA DE MÍDIA (IMAGENS / VÍDEOS / CLIMA / RSS) */}
+      <MediaPreviewModal
+        media={previewModalMedia}
+        onClose={() => setPreviewModalMedia(null)}
+        onAddToPlaylist={mediaPickerModalOpen ? (m) => handleSelectMediaForPlaylist(m) : undefined}
+        isAlreadyInPlaylist={
+          previewModalMedia
+            ? playlistForm.items.some((it) => it.media_id === previewModalMedia.id)
+            : false
+        }
+      />
 
       {/* CONFIRMAÇÃO DE AÇÃO */}
       <ConfirmModal

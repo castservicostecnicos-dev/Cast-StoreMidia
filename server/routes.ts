@@ -18,6 +18,7 @@ import {
   CallPhrase,
   PlayerCall,
   seedDefaultRssFeedsForCompany,
+  ensureCompanyDefaultMedia,
   DEFAULT_RSS_FEEDS,
   DEFAULT_PLANS,
   uploadsDir,
@@ -384,8 +385,9 @@ apiRouter.get('/admin/companies', requireAuth, requireRole('admin'), (_req, res)
     return {
       ...c,
       plan_name: plan?.name || 'Sem plano',
-      max_players: plan?.max_players,
-      max_operators: plan?.max_operators,
+      max_players: (c.max_players !== undefined && c.max_players !== null) ? c.max_players : plan?.max_players,
+      max_operators: (c.max_operators !== undefined && c.max_operators !== null) ? c.max_operators : plan?.max_operators,
+      is_custom_limits: (c.max_players !== undefined && c.max_players !== null) || (c.max_operators !== undefined && c.max_operators !== null),
       player_count: playerCount,
       operator_count: operatorCount,
       user_email: user?.email,
@@ -481,6 +483,8 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     city: city ? String(city).trim() : '',
     state: state ? String(state).trim().toUpperCase() : '',
     plan_id: selectedPlanId,
+    max_players: req.body.max_players !== undefined && req.body.max_players !== '' ? Number(req.body.max_players) : undefined,
+    max_operators: req.body.max_operators !== undefined && req.body.max_operators !== '' ? Number(req.body.max_operators) : undefined,
     start_date: start_date || now.split('T')[0],
     due_date: due_date || '',
     status: 'active',
@@ -636,6 +640,12 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
   if (city !== undefined) company.city = String(city).trim();
   if (state !== undefined) company.state = String(state).trim().toUpperCase();
   if (plan_id && data.plans.some((p) => p.id === plan_id)) company.plan_id = plan_id;
+  if (req.body.max_players !== undefined) {
+    company.max_players = req.body.max_players === '' || req.body.max_players === null ? undefined : Number(req.body.max_players);
+  }
+  if (req.body.max_operators !== undefined) {
+    company.max_operators = req.body.max_operators === '' || req.body.max_operators === null ? undefined : Number(req.body.max_operators);
+  }
   if (start_date) company.start_date = start_date;
   if (due_date !== undefined) company.due_date = due_date;
   if (status) company.status = status;
@@ -845,8 +855,8 @@ apiRouter.get('/company/stats', requireAuth, requireRole('company'), (req: Authe
     mediaCount: media.length,
     plan: plan || null,
     limits: {
-      max_players: plan?.max_players || 0,
-      max_operators: plan?.max_operators || 0,
+      max_players: (company?.max_players !== undefined && company.max_players !== null) ? company.max_players : (plan?.max_players || 0),
+      max_operators: (company?.max_operators !== undefined && company.max_operators !== null) ? company.max_operators : (plan?.max_operators || 0),
       max_storage: plan?.max_storage || 0,
     },
   });
@@ -900,10 +910,14 @@ apiRouter.post('/company/players', requireAuth, requireRole('company'), (req: Au
   const plan = data.plans.find((p) => p.id === company?.plan_id);
 
   // Check quota limit
+  const effectiveMaxPlayers = (company?.max_players !== undefined && company.max_players !== null)
+    ? company.max_players
+    : (plan?.max_players || 0);
+
   const currentCount = data.players.filter((p) => p.company_id === companyId).length;
-  if (plan && currentCount >= plan.max_players) {
+  if (effectiveMaxPlayers > 0 && currentCount >= effectiveMaxPlayers) {
     return res.status(400).json({
-      error: `Limite de players atingido (${currentCount}/${plan.max_players}). Faça upgrade do plano contratado.`,
+      error: `Limite de telas/players atingido (${currentCount}/${effectiveMaxPlayers}). Faça upgrade do plano contratado ou solicite expansão de limite ao administrador.`,
     });
   }
 
@@ -1090,15 +1104,19 @@ apiRouter.post('/company/operators', requireAuth, requireRole('company'), (req: 
   const plan = data.plans.find((p) => p.id === company?.plan_id);
 
   // Check quota limit
+  const effectiveMaxOperators = (company?.max_operators !== undefined && company.max_operators !== null)
+    ? company.max_operators
+    : (plan?.max_operators ?? 0);
+
   const currentCount = data.operators.filter((o) => o.company_id === companyId).length;
-  if (plan && currentCount >= plan.max_operators) {
-    if (plan.max_operators === 0) {
+  if (effectiveMaxOperators !== undefined && currentCount >= effectiveMaxOperators) {
+    if (effectiveMaxOperators === 0) {
       return res.status(400).json({
-        error: 'O plano contratado (Linha Show) é exclusivo para exibição de mídias e notícias e não inclui módulo de operadores/chamadas na tela. Faça upgrade para um plano Call para cadastrar operadores.',
+        error: 'O plano ou configuração atual (Linha Show) não inclui operadores/chamadas na tela. Contate o administrador ou solicite liberação de operadores para planos especiais.',
       });
     }
     return res.status(400).json({
-      error: `Limite de operadores atingido (${currentCount}/${plan.max_operators}). Faça upgrade do plano contratado.`,
+      error: `Limite de operadores atingido (${currentCount}/${effectiveMaxOperators}). Faça upgrade do plano contratado ou solicite ao administrador a definição de limites especiais para sua empresa.`,
     });
   }
 
@@ -1230,6 +1248,10 @@ apiRouter.delete('/company/operators/:id', requireAuth, requireRole('company'), 
 apiRouter.get('/company/playlists', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
   const companyId = req.user!.company_id!;
   const data = db.getData();
+  const injected = ensureCompanyDefaultMedia(companyId, data);
+  if (injected) {
+    db.persist();
+  }
   const playlists = data.playlists.filter((p) => p.company_id === companyId);
   res.json(playlists);
 });
@@ -1345,6 +1367,119 @@ apiRouter.delete('/company/playlists/:id', requireAuth, requireRole('company'), 
   res.json({ message: 'Playlist excluída com sucesso.' });
 });
 
+// Quick add Weather/Clock to playlist
+apiRouter.post('/company/weather/add-to-playlist', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id!;
+  const { playlist_id, duration } = req.body;
+  const data = db.getData();
+  const now = new Date().toISOString();
+
+  ensureCompanyDefaultMedia(companyId, data, now);
+
+  const playlist = playlist_id
+    ? data.playlists.find((p) => p.id === playlist_id && p.company_id === companyId)
+    : data.playlists.find((p) => p.company_id === companyId);
+
+  if (!playlist) {
+    return res.status(404).json({ error: 'Nenhuma playlist encontrada para esta empresa.' });
+  }
+
+  let weatherMedia = data.media.find((m) => m.company_id === companyId && m.type === 'weather_clock');
+  if (!weatherMedia) {
+    weatherMedia = {
+      id: `med-${companyId}-weather`,
+      company_id: companyId,
+      name: 'Hora Certa & Previsão do Tempo',
+      type: 'weather_clock',
+      file_url: 'widget:weather_clock',
+      duration: duration || 12,
+      active: true,
+      created_at: now,
+      updated_at: now,
+    };
+    data.media.push(weatherMedia);
+  }
+
+  const newItem: PlaylistItem = {
+    id: `pli-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    playlist_id: playlist.id,
+    media_id: weatherMedia.id,
+    position: (playlist.items?.length || 0) + 1,
+    duration: duration || weatherMedia.duration || 12,
+    created_at: now,
+  };
+
+  playlist.items = playlist.items || [];
+  playlist.items.push(newItem);
+  playlist.updated_at = now;
+  db.persist();
+
+  res.json({
+    message: 'Hora Certa & Previsão do Tempo incluída com sucesso na playlist!',
+    playlist,
+    item: newItem,
+  });
+});
+
+// Quick add RSS news feed to playlist
+apiRouter.post('/company/rss/add-to-playlist', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id!;
+  const { playlist_id, rss_url, name, duration } = req.body;
+  if (!rss_url) {
+    return res.status(400).json({ error: 'URL do Feed RSS é obrigatória.' });
+  }
+
+  const data = db.getData();
+  const now = new Date().toISOString();
+
+  const playlist = playlist_id
+    ? data.playlists.find((p) => p.id === playlist_id && p.company_id === companyId)
+    : data.playlists.find((p) => p.company_id === companyId);
+
+  if (!playlist) {
+    return res.status(404).json({ error: 'Nenhuma playlist encontrada para esta empresa.' });
+  }
+
+  let rssMedia = data.media.find(
+    (m) => m.company_id === companyId && m.type === 'rss' && m.file_url.trim() === String(rss_url).trim()
+  );
+
+  if (!rssMedia) {
+    rssMedia = {
+      id: `med-${companyId}-rss-${Date.now()}`,
+      company_id: companyId,
+      name: name || 'Notícias RSS em Tempo Real',
+      type: 'rss',
+      file_url: String(rss_url).trim(),
+      duration: duration || 15,
+      active: true,
+      created_at: now,
+      updated_at: now,
+    };
+    data.media.push(rssMedia);
+  }
+
+  const newItem: PlaylistItem = {
+    id: `pli-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    playlist_id: playlist.id,
+    media_id: rssMedia.id,
+    position: (playlist.items?.length || 0) + 1,
+    duration: duration || rssMedia.duration || 15,
+    created_at: now,
+  };
+
+  playlist.items = playlist.items || [];
+  playlist.items.push(newItem);
+  playlist.updated_at = now;
+  db.persist();
+
+  res.json({
+    message: `Notícias RSS "${rssMedia.name}" incluídas na playlist "${playlist.name}"!`,
+    playlist,
+    item: newItem,
+  });
+});
+
 // Direct File Upload from Device
 apiRouter.post('/upload', requireAuth, (req: AuthenticatedRequest, res) => {
   try {
@@ -1418,6 +1553,10 @@ apiRouter.post('/upload', requireAuth, (req: AuthenticatedRequest, res) => {
 apiRouter.get('/company/media', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
   const companyId = req.user!.company_id!;
   const data = db.getData();
+  const injected = ensureCompanyDefaultMedia(companyId, data);
+  if (injected) {
+    db.persist();
+  }
   const media = data.media.filter((m) => m.company_id === companyId);
   res.json(media);
 });

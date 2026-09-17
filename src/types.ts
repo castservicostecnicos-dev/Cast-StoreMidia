@@ -29,6 +29,7 @@ export interface Company {
   operator_count?: number;
   max_players?: number;
   max_operators?: number;
+  is_custom_limits?: boolean;
   created_at: string;
   updated_at: string;
   drive_folder_id?: string;

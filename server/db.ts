@@ -38,6 +38,8 @@ export interface Company {
   start_date: string;
   due_date: string;
   status: 'active' | 'inactive';
+  max_players?: number;
+  max_operators?: number;
   created_at: string;
   updated_at: string;
   drive_folder_id?: string;
@@ -168,6 +170,68 @@ export const DEFAULT_RSS_FEEDS: RssPreset[] = [
     category: 'Tecnologia',
   },
 ];
+
+export function ensureCompanyDefaultMedia(
+  companyId: string,
+  data: DatabaseSchema,
+  now: string = new Date().toISOString()
+): boolean {
+  let changed = false;
+
+  // 1. Ensure RSS feeds exist
+  seedDefaultRssFeedsForCompany(companyId, data, now);
+
+  // 2. Ensure Weather & Clock media exists for this company
+  const hasWeather = data.media.some((m) => m.company_id === companyId && m.type === 'weather_clock');
+  if (!hasWeather) {
+    const weatherId = `med-${companyId}-weather`;
+    data.media.push({
+      id: weatherId,
+      company_id: companyId,
+      name: 'Hora Certa & Previsão do Tempo',
+      type: 'weather_clock',
+      file_url: 'widget:weather_clock',
+      duration: 12,
+      active: true,
+      created_at: now,
+      updated_at: now,
+    });
+    changed = true;
+  }
+
+  // 3. Ensure full-screen RSS Media items exist for common news channels
+  const rssPresets = [
+    { name: 'Notícias RSS - Saúde & Bem-Estar', url: 'https://g1.globo.com/rss/g1/saude/', duration: 15 },
+    { name: 'Notícias RSS - G1 Brasil', url: 'https://g1.globo.com/rss/g1/brasil/', duration: 15 },
+    { name: 'Notícias RSS - Tecnologia & Inovação', url: 'https://g1.globo.com/rss/g1/tecnologia/', duration: 15 },
+    { name: 'Notícias RSS - Economia & Negócios', url: 'https://g1.globo.com/rss/g1/economia/', duration: 15 },
+  ];
+
+  for (const preset of rssPresets) {
+    const exists = data.media.some(
+      (m) =>
+        m.company_id === companyId &&
+        m.type === 'rss' &&
+        (m.file_url.trim() === preset.url.trim() || m.name.toLowerCase() === preset.name.toLowerCase())
+    );
+    if (!exists) {
+      data.media.push({
+        id: `med-${companyId}-rss-${Math.random().toString(36).substring(2, 7)}`,
+        company_id: companyId,
+        name: preset.name,
+        type: 'rss',
+        file_url: preset.url,
+        duration: preset.duration,
+        active: true,
+        created_at: now,
+        updated_at: now,
+      });
+      changed = true;
+    }
+  }
+
+  return changed;
+}
 
 export function seedDefaultRssFeedsForCompany(
   companyId: string,
@@ -438,36 +502,11 @@ class DatabaseStore {
           }
         }
 
-        // Ensure weather_clock media item exists
-        if (this.data.media) {
-          const hasWeatherMedia = this.data.media.some((m) => m.type === 'weather_clock');
-          if (!hasWeatherMedia && this.data.companies && this.data.companies.length > 0) {
-            const cId = this.data.companies[0].id;
-            const now = new Date().toISOString();
-            const weatherMedia: Media = {
-              id: 'med-weather-clock',
-              company_id: cId,
-              name: 'Hora Certa & Previsão do Tempo',
-              type: 'weather_clock',
-              file_url: 'widget:weather_clock',
-              duration: 12,
-              active: true,
-              created_at: now,
-              updated_at: now,
-            };
-            this.data.media.push(weatherMedia);
-            changed = true;
-
-            const pl = this.data.playlists?.find((p) => p.company_id === cId);
-            if (pl && !pl.items.some((it) => it.media_id === 'med-weather-clock')) {
-              pl.items.push({
-                id: `pli-${Date.now()}-weather`,
-                playlist_id: pl.id,
-                media_id: 'med-weather-clock',
-                position: pl.items.length + 1,
-                duration: 12,
-                created_at: now,
-              });
+        // Ensure every company has Weather & Clock and RSS media items loaded
+        if (this.data.companies && this.data.media) {
+          const now = new Date().toISOString();
+          for (const comp of this.data.companies) {
+            if (ensureCompanyDefaultMedia(comp.id, this.data, now)) {
               changed = true;
             }
           }
@@ -477,18 +516,6 @@ class DatabaseStore {
         if (this.data.call_phrases && this.data.call_phrases.length > 0) {
           this.data.call_phrases = [];
           changed = true;
-        }
-
-        // Ensure every company has default RSS feeds loaded
-        if (this.data.companies && this.data.rss_feeds) {
-          const now = new Date().toISOString();
-          for (const comp of this.data.companies) {
-            const currentCount = this.data.rss_feeds.filter((r) => r.company_id === comp.id).length;
-            if (currentCount < DEFAULT_RSS_FEEDS.length) {
-              seedDefaultRssFeedsForCompany(comp.id, this.data, now);
-              changed = true;
-            }
-          }
         }
 
         // Synchronize the 6 official plans: Call Básico, Call Intermediário, Call Pro, Show Básico, Show Intermediário, Show Pro
@@ -629,6 +656,25 @@ class DatabaseStore {
           console.log(
             `[DatabaseStore] Restored from Firebase Firestore! Loaded ${cloudCompanies.length} companies, ${cloudData.players?.length || 0} players, ${cloudData.users?.length || 0} users.`
           );
+        }
+
+        // Verify that all companies have Weather & Clock and RSS media items loaded
+        if (this.data.companies && this.data.media) {
+          const now = new Date().toISOString();
+          let anyAdded = false;
+          for (const comp of this.data.companies) {
+            if (ensureCompanyDefaultMedia(comp.id, this.data, now)) {
+              anyAdded = true;
+            }
+          }
+          if (anyAdded) {
+            try {
+              fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
+              await saveDatabaseToFirestoreNow(this.data);
+            } catch (e) {
+              console.warn('[DatabaseStore] Could not write default media cache to disk:', e);
+            }
+          }
         }
       } else if (res.status === 'not_found') {
         console.log('[DatabaseStore] No prior Firestore document found. Initializing Firestore with current database...');
