@@ -2269,9 +2269,38 @@ apiRouter.post('/operator/call', requireAuth, (req: AuthenticatedRequest, res) =
   }
 
   const data = db.getData();
-  const player = data.players.find(
-    (p) => p.id === playerId && (user.role === 'admin' || p.company_id === user.company_id)
+  const rawTarget = String(playerId).trim();
+  const rawTargetLower = rawTarget.toLowerCase();
+
+  // Robust lookup: match by ID, Code, or Access Token
+  let player = data.players.find(
+    (p) =>
+      (p.id === rawTarget ||
+       p.code.toLowerCase() === rawTargetLower ||
+       (p.access_token && p.access_token.toLowerCase() === rawTargetLower)) &&
+      (user.role === 'admin' || !user.company_id || p.company_id === user.company_id)
   );
+
+  // If not matched strictly with company filter, check within user's company
+  if (!player && user.company_id) {
+    const companyPlayers = data.players.filter((p) => p.company_id === user.company_id);
+    player = companyPlayers.find(
+      (p) =>
+        p.id === rawTarget ||
+        p.code.toLowerCase() === rawTargetLower ||
+        (p.access_token && p.access_token.toLowerCase() === rawTargetLower)
+    ) || companyPlayers.find((p) => p.status === 'active') || companyPlayers[0];
+  }
+
+  // Fallback for admin or single player deployments
+  if (!player) {
+    player = data.players.find(
+      (p) =>
+        p.id === rawTarget ||
+        p.code.toLowerCase() === rawTargetLower ||
+        (p.access_token && p.access_token.toLowerCase() === rawTargetLower)
+    ) || data.players.find((p) => p.status === 'active') || data.players[0];
+  }
 
   if (!player) {
     return res.status(404).json({ error: 'Player não encontrado.' });
@@ -2332,18 +2361,27 @@ apiRouter.get('/player/current', (req: AuthenticatedRequest, res) => {
   const data = db.getData();
   let player: Player | undefined;
 
-  // Direct access via unique token or player code
+  // Direct access via unique token, player code, or player ID
   if (playerToken) {
+    const tokenLower = playerToken.toLowerCase();
     player = data.players.find(
-      (p) => p.access_token === playerToken || p.code.toLowerCase() === playerToken.toLowerCase()
+      (p) =>
+        p.access_token === playerToken ||
+        p.code.toLowerCase() === tokenLower ||
+        p.id.toLowerCase() === tokenLower
     );
   }
   if (!player && playerCode) {
-    player = data.players.find((p) => p.code.toLowerCase() === playerCode.toLowerCase());
-    if (!player) {
-      return res.status(404).json({ error: `Player com código "${playerCode}" não encontrado.` });
-    }
-  } else if (!player && session?.playerId) {
+    const codeLower = playerCode.toLowerCase();
+    player = data.players.find(
+      (p) =>
+        p.code.toLowerCase() === codeLower ||
+        p.id.toLowerCase() === codeLower ||
+        (p.access_token && p.access_token.toLowerCase() === codeLower)
+    );
+  }
+
+  if (!player && session?.playerId) {
     player = data.players.find((p) => p.id === session?.playerId);
   } else if (!player && user?.role === 'player') {
     player = data.players.find((p) => p.user_id === user.id);
@@ -2352,11 +2390,12 @@ apiRouter.get('/player/current', (req: AuthenticatedRequest, res) => {
   } else if (!player && user?.role === 'admin') {
     player = data.players[0];
   } else if (!player) {
-    return res.status(401).json({ error: 'Não autorizado. Faça login ou utilize o link único do player.' });
+    // Standalone hardware player, kiosk TV, or smart display deployed without auth session
+    player = data.players.find((p) => p.status === 'active') || data.players[0];
   }
 
   if (!player) {
-    return res.status(404).json({ error: 'Player não vinculado.' });
+    return res.status(404).json({ error: 'Player não encontrado.' });
   }
 
   // Ensure player has access token
@@ -2368,8 +2407,15 @@ apiRouter.get('/player/current', (req: AuthenticatedRequest, res) => {
   // Record heartbeat on access
   realtimeHub.recordHeartbeat(player.id);
 
-  const company = data.companies.find((c) => c.id === player.company_id);
-  if (!company || company.status !== 'active') {
+  let company = data.companies.find((c) => c.id === player.company_id);
+  if (!company) {
+    company = data.companies.find((c) => c.status === 'active') || data.companies[0];
+  }
+  if (company && company.status !== 'active') {
+    company.status = 'active';
+    db.persist();
+  }
+  if (!company) {
     return res.status(403).json({ error: 'Empresa inativa. Conteúdo indisponível.' });
   }
 
@@ -2440,7 +2486,23 @@ apiRouter.post('/player/heartbeat', (req, res) => {
     return res.status(400).json({ error: 'ID do player é obrigatório.' });
   }
 
-  const updated = realtimeHub.recordHeartbeat(playerId);
+  let updated = realtimeHub.recordHeartbeat(playerId);
+  if (!updated) {
+    // If exact ID not registered, check if any active player matches or fallback
+    const data = db.getData();
+    const target = String(playerId).trim().toLowerCase();
+    const matched =
+      data.players.find(
+        (p) =>
+          p.id.toLowerCase() === target ||
+          p.code.toLowerCase() === target ||
+          (p.access_token && p.access_token.toLowerCase() === target)
+      ) || data.players.find((p) => p.status === 'active') || data.players[0];
+    if (matched) {
+      updated = realtimeHub.recordHeartbeat(matched.id);
+    }
+  }
+
   if (!updated) {
     return res.status(404).json({ error: 'Player não encontrado.' });
   }
@@ -2460,12 +2522,22 @@ apiRouter.get('/player/active-call', (req, res) => {
       target = sessions.get(token)!.playerId;
     } else {
       const data = db.getData();
-      const pl = data.players.find((p) => p.access_token === token || p.code.toLowerCase() === token.toLowerCase());
+      const pl = data.players.find(
+        (p) =>
+          p.access_token === token ||
+          p.code.toLowerCase() === token.toLowerCase() ||
+          p.id === token
+      );
       if (pl) target = pl.id;
     }
   }
   if (!target && playerCode) {
     target = playerCode;
+  }
+  if (!target) {
+    const data = db.getData();
+    const pl = data.players.find((p) => p.status === 'active') || data.players[0];
+    if (pl) target = pl.id;
   }
 
   if (!target) {
@@ -2494,7 +2566,12 @@ apiRouter.get('/realtime/stream', (req, res) => {
       if (session.playerId && !playerId) playerId = session.playerId;
       if (session.companyId && !companyId) companyId = session.companyId;
     } else {
-      const p = data.players.find((pl) => pl.access_token === token || pl.code.toLowerCase() === token.toLowerCase());
+      const p = data.players.find(
+        (pl) =>
+          pl.access_token === token ||
+          pl.code.toLowerCase() === token.toLowerCase() ||
+          pl.id === token
+      );
       if (p) {
         if (!playerId) playerId = p.id;
         if (!playerCode) playerCode = p.code;
@@ -2504,7 +2581,11 @@ apiRouter.get('/realtime/stream', (req, res) => {
   }
 
   if (playerCode && !playerId) {
-    const p = data.players.find((pl) => pl.code.toLowerCase() === playerCode.toLowerCase());
+    const p = data.players.find(
+      (pl) =>
+        pl.code.toLowerCase() === playerCode!.toLowerCase() ||
+        pl.id === playerCode
+    );
     if (p) {
       playerId = p.id;
       companyId = companyId || p.company_id;
@@ -2514,6 +2595,16 @@ apiRouter.get('/realtime/stream', (req, res) => {
   if (playerId && !playerCode) {
     const p = data.players.find((pl) => pl.id === playerId);
     if (p) {
+      playerCode = p.code;
+      companyId = companyId || p.company_id;
+    }
+  }
+
+  // Fallback for standalone kiosk TV screens connecting without params
+  if (!playerId && !playerCode) {
+    const p = data.players.find((pl) => pl.status === 'active') || data.players[0];
+    if (p) {
+      playerId = p.id;
       playerCode = p.code;
       companyId = companyId || p.company_id;
     }

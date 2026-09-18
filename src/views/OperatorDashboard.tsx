@@ -82,8 +82,15 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     try {
       const res = await api.getOperatorDashboard();
       setPlayers(res.players);
-      if (res.players.length > 0 && !selectedPlayerId) {
-        setSelectedPlayerId(res.players[0].id);
+      if (res.players.length > 0) {
+        setSelectedPlayerId((prev) => {
+          const match = res.players.find((p) => p.id === prev);
+          const validId = match ? match.id : res.players[0].id;
+          try {
+            localStorage.setItem('indoor_op_player_id', validId);
+          } catch {}
+          return validId;
+        });
       }
     } catch (err: any) {
       showToast('error', err.message || 'Erro ao carregar dados do operador.');
@@ -97,6 +104,12 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
       api.getOperatorDashboard()
         .then((res) => {
           setPlayers(res.players);
+          if (res.players.length > 0) {
+            setSelectedPlayerId((prev) => {
+              const match = res.players.find((p) => p.id === prev);
+              return match ? match.id : res.players[0].id;
+            });
+          }
         })
         .catch(() => {});
     }, 10000);
@@ -104,7 +117,9 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
   }, []);
 
   const handleTriggerCall = async (overridePriority?: boolean) => {
-    if (!selectedPlayerId) {
+    const targetPlayer = players.find((p) => p.id === selectedPlayerId) || players[0];
+    const targetPlayerId = targetPlayer?.id || selectedPlayerId;
+    if (!targetPlayerId) {
       showToast('error', 'Selecione um player de exibição.');
       return;
     }
@@ -117,7 +132,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     setIsCalling(true);
     try {
       const res = await api.triggerCall({
-        playerId: selectedPlayerId,
+        playerId: targetPlayerId,
         phrase: callText.trim(),
         duration,
         isPriority: priorityToSend,

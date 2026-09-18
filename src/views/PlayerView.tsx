@@ -309,6 +309,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
   const loadPlayerData = async () => {
     const effectiveKey = overridePlayerToken || overridePlayerCode || 'default';
     const offlineCacheKey = `indoor_player_offline_data_${effectiveKey}`;
+
+    const getAnyCachedData = (): CurrentPlayerData | null => {
+      try {
+        const specific = localStorage.getItem(offlineCacheKey);
+        if (specific) return JSON.parse(specific);
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('indoor_player_offline_data_')) {
+            const val = localStorage.getItem(key);
+            if (val) return JSON.parse(val);
+          }
+        }
+      } catch {}
+      return null;
+    };
+
     try {
       setLoading(true);
       setError(null);
@@ -319,15 +335,19 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
         if (res) {
           try {
             localStorage.setItem(offlineCacheKey, JSON.stringify(res));
+            localStorage.setItem('indoor_player_offline_data_default', JSON.stringify(res));
+            if (res.player?.code) {
+              localStorage.setItem(`indoor_player_offline_data_${res.player.code}`, JSON.stringify(res));
+            }
           } catch (e) {}
           setIsOfflinePlayback(false);
         }
       } catch (netErr: any) {
         // Fallback to local storage if network request fails or device is offline
-        const localCached = localStorage.getItem(offlineCacheKey);
+        const localCached = getAnyCachedData();
         if (localCached) {
           console.log('Utilizando playlist do cache local offline para reprodução contínua.');
-          res = JSON.parse(localCached);
+          res = localCached;
           setIsOfflinePlayback(true);
         } else {
           throw netErr;
@@ -353,14 +373,13 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
       }
     } catch (err: any) {
       // Check again if local cache can rescue the screen
-      const localCached = localStorage.getItem(offlineCacheKey);
+      const localCached = getAnyCachedData();
       if (localCached) {
         try {
-          const parsed = JSON.parse(localCached);
-          setData(parsed);
+          setData(localCached);
           setIsOfflinePlayback(true);
           setError(null);
-          precachePlaylistAssets(parsed.items);
+          precachePlaylistAssets(localCached.items);
           return;
         } catch (e) {}
       }

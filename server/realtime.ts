@@ -61,16 +61,21 @@ class RealtimeHub {
   }
 
   public getActiveCall(playerIdOrCode: string): PlayerCall | null {
-    const target = playerIdOrCode.trim().toLowerCase();
+    const target = (playerIdOrCode || '').trim().toLowerCase();
+    if (!target) return null;
     const data = db.getData();
 
-    // Find player ID if a code was passed
+    // Find player ID if a code or token was passed
     const player = data.players.find(
-      (p) => p.id.toLowerCase() === target || p.code.toLowerCase() === target
+      (p) =>
+        p.id.toLowerCase() === target ||
+        p.code.toLowerCase() === target ||
+        (p.access_token && p.access_token.toLowerCase() === target)
     );
     const playerId = player ? player.id : target;
+    const playerCode = player ? player.code.toLowerCase() : target;
 
-    const memoryCall = this.activeCalls.get(playerId);
+    const memoryCall = this.activeCalls.get(playerId) || this.activeCalls.get(playerCode);
     const now = Date.now();
 
     if (memoryCall) {
@@ -79,18 +84,20 @@ class RealtimeHub {
         return memoryCall;
       } else {
         this.activeCalls.delete(playerId);
+        this.activeCalls.delete(playerCode);
       }
     }
 
     // Check persistent db calls
     const recent = [...data.player_calls]
-      .filter((c) => c.player_id === playerId)
+      .filter((c) => c.player_id === playerId || (player && c.player_id === player.id))
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
     if (recent) {
       const elapsed = now - new Date(recent.created_at).getTime();
       if (elapsed < (recent.duration || 10) * 1000) {
         this.activeCalls.set(playerId, recent);
+        if (playerCode) this.activeCalls.set(playerCode, recent);
         return recent;
       }
     }
@@ -100,15 +107,25 @@ class RealtimeHub {
 
   public sendCallToPlayer(call: PlayerCall) {
     this.activeCalls.set(call.player_id, call);
+    const targetPlayer = db.getData().players.find(
+      (p) =>
+        p.id === call.player_id ||
+        p.code.toLowerCase() === call.player_id.toLowerCase()
+    );
+    if (targetPlayer) {
+      this.activeCalls.set(targetPlayer.id, call);
+      this.activeCalls.set(targetPlayer.code.toLowerCase(), call);
+    }
+
     const message = `data: ${JSON.stringify({ type: 'CALL_EVENT', call, data: call })}\n\n`;
     let deliveredCount = 0;
 
-    const targetPlayer = db.getData().players.find((p) => p.id === call.player_id);
     const targetCode = targetPlayer?.code?.toLowerCase();
+    const targetId = targetPlayer?.id || call.player_id;
 
     for (const client of this.clients) {
       const isPlayerMatch =
-        (client.playerId && client.playerId === call.player_id) ||
+        (client.playerId && (client.playerId === targetId || client.playerId === targetCode)) ||
         (targetCode && client.playerCode && client.playerCode.toLowerCase() === targetCode);
 
       const isCompanyMonitor =
@@ -148,9 +165,17 @@ class RealtimeHub {
     }
   }
 
-  public recordHeartbeat(playerId: string) {
+  public recordHeartbeat(playerIdOrCode: string) {
     const data = db.getData();
-    const player = data.players.find((p) => p.id === playerId);
+    const target = String(playerIdOrCode || '').trim().toLowerCase();
+    if (!target) return false;
+
+    const player = data.players.find(
+      (p) =>
+        p.id.toLowerCase() === target ||
+        p.code.toLowerCase() === target ||
+        (p.access_token && p.access_token.toLowerCase() === target)
+    );
     if (!player) return false;
 
     const previousLastSeen = new Date(player.last_seen || 0).getTime();
