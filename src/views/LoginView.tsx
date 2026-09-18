@@ -97,10 +97,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-900/50">
-            <Tv className="h-7 w-7" />
-          </div>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-white uppercase sm:text-3xl">MÍDIA INDOOR</h1>
+          <img
+            src="/pwa-192x192.png"
+            alt="CAST Mídia Indoor"
+            className="mx-auto h-24 w-24 rounded-2xl object-cover shadow-2xl shadow-blue-950/80 border border-slate-700/80"
+          />
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-white uppercase sm:text-3xl">
+            CAST <span className="text-blue-400">MÍDIA INDOOR</span>
+          </h1>
           <p className="mt-1 text-xs tracking-wider text-slate-400 uppercase">Sistema de Gestão e Reprodução de Mídia</p>
         </div>
 

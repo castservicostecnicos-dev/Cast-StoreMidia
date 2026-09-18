@@ -61,13 +61,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-8">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm shrink-0">
-            M
-          </div>
+          <img
+            src="/apple-touch-icon.png"
+            alt="CAST Mídia Indoor"
+            className="w-9 h-9 rounded-xl object-cover shadow-sm shrink-0 border border-slate-700/80"
+          />
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="text-base sm:text-xl font-semibold tracking-tight uppercase text-white">
-                MÍDIA<span className="text-blue-400">INDOOR</span>
+              <span className="text-base sm:text-xl font-bold tracking-tight uppercase text-white">
+                CAST <span className="text-blue-400 font-semibold text-sm sm:text-base">MÍDIA INDOOR</span>
               </span>
               <span className={`hidden xs:inline text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${roleColors[user.role]}`}>
                 {getRoleLabel(user.role)}
