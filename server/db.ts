@@ -475,8 +475,8 @@ export const dataDir = process.env.DATA_DIR
 
 export const dbPath = path.join(dataDir, 'indoor_media.json');
 
-export const uploadsDir = process.env.UPLOADS_DIR
-  ? path.resolve(process.env.UPLOADS_DIR)
+export const uploadsDir = (process.env.UPLOAD_DIR || process.env.UPLOADS_DIR)
+  ? path.resolve((process.env.UPLOAD_DIR || process.env.UPLOADS_DIR)!)
   : (process.env.DATA_DIR ? path.join(dataDir, 'uploads') : path.resolve(process.cwd(), 'uploads'));
 
 class DatabaseStore {

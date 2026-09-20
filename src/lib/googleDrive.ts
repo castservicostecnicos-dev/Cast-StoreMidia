@@ -302,15 +302,22 @@ export const uploadFileToDrive = async (
   file: File | Blob,
   fileName: string,
   folderId: string,
-  options?: {
-    description?: string;
-    uniqueCode?: string;
-  }
+  options?:
+    | {
+        description?: string;
+        uniqueCode?: string;
+      }
+    | string
 ): Promise<DriveUploadResult> => {
+  const desc =
+    typeof options === 'string'
+      ? options
+      : options?.description || `Código Único: ${options?.uniqueCode || 'N/A'}`;
+
   const metadata = {
     name: fileName,
     parents: [folderId],
-    description: options?.description || `Código Único: ${options?.uniqueCode || 'N/A'}`,
+    description: desc,
   };
 
   const formData = new FormData();

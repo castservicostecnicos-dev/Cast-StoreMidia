@@ -21,6 +21,7 @@ async function startServer() {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
   app.use('/uploads', express.static(uploadsDir));
+  app.use('/api/uploads', express.static(uploadsDir));
 
   // Middleware for body parsing
   app.use(express.json({ limit: '50mb' }));
