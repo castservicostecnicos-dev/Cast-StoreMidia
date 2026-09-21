@@ -381,15 +381,18 @@ apiRouter.get('/admin/companies', requireAuth, requireRole('admin'), (_req, res)
     const plan = data.plans.find((p) => p.id === c.plan_id);
     const playerCount = data.players.filter((p) => p.company_id === c.id).length;
     const operatorCount = data.operators.filter((o) => o.company_id === c.id).length;
+    const mediaCount = data.media.filter((m) => m.company_id === c.id).length;
     const user = data.users.find((u) => u.company_id === c.id && u.role === 'company');
     return {
       ...c,
       plan_name: plan?.name || 'Sem plano',
       max_players: (c.max_players !== undefined && c.max_players !== null) ? c.max_players : plan?.max_players,
       max_operators: (c.max_operators !== undefined && c.max_operators !== null) ? c.max_operators : plan?.max_operators,
-      is_custom_limits: (c.max_players !== undefined && c.max_players !== null) || (c.max_operators !== undefined && c.max_operators !== null),
+      max_media: (c.max_media !== undefined && c.max_media !== null) ? c.max_media : (plan?.max_media || plan?.max_storage || 20),
+      is_custom_limits: (c.max_players !== undefined && c.max_players !== null) || (c.max_operators !== undefined && c.max_operators !== null) || (c.max_media !== undefined && c.max_media !== null),
       player_count: playerCount,
       operator_count: operatorCount,
+      media_count: mediaCount,
       user_email: user?.email,
     };
   });
@@ -485,6 +488,9 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     plan_id: selectedPlanId,
     max_players: req.body.max_players !== undefined && req.body.max_players !== '' ? Number(req.body.max_players) : undefined,
     max_operators: req.body.max_operators !== undefined && req.body.max_operators !== '' ? Number(req.body.max_operators) : undefined,
+    max_media: req.body.max_media !== undefined && req.body.max_media !== '' ? Number(req.body.max_media) : undefined,
+    drive_folder_id: req.body.drive_folder_id || undefined,
+    drive_folder_url: req.body.drive_folder_url || undefined,
     start_date: start_date || now.split('T')[0],
     due_date: due_date || '',
     status: 'active',
@@ -645,6 +651,15 @@ apiRouter.put('/admin/companies/:id', requireAuth, requireRole('admin'), (req, r
   }
   if (req.body.max_operators !== undefined) {
     company.max_operators = req.body.max_operators === '' || req.body.max_operators === null ? undefined : Number(req.body.max_operators);
+  }
+  if (req.body.max_media !== undefined) {
+    company.max_media = req.body.max_media === '' || req.body.max_media === null ? undefined : Number(req.body.max_media);
+  }
+  if (req.body.drive_folder_id !== undefined) {
+    company.drive_folder_id = req.body.drive_folder_id || undefined;
+  }
+  if (req.body.drive_folder_url !== undefined) {
+    company.drive_folder_url = req.body.drive_folder_url || undefined;
   }
   if (start_date) company.start_date = start_date;
   if (due_date !== undefined) company.due_date = due_date;
@@ -854,12 +869,32 @@ apiRouter.get('/company/stats', requireAuth, requireRole('company'), (req: Authe
     playlistsCount: playlists.length,
     mediaCount: media.length,
     plan: plan || null,
+    drive_folder_url: company?.drive_folder_url || null,
+    drive_folder_id: company?.drive_folder_id || null,
     limits: {
       max_players: (company?.max_players !== undefined && company.max_players !== null) ? company.max_players : (plan?.max_players || 0),
       max_operators: (company?.max_operators !== undefined && company.max_operators !== null) ? company.max_operators : (plan?.max_operators || 0),
-      max_storage: plan?.max_storage || 0,
+      max_media: (company?.max_media !== undefined && company.max_media !== null) ? company.max_media : (plan?.max_media || plan?.max_storage || 20),
+      max_storage: (company?.max_media !== undefined && company.max_media !== null) ? company.max_media : (plan?.max_storage || 20),
     },
   });
+});
+
+apiRouter.put('/company/drive-folder', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id!;
+  const { drive_folder_id, drive_folder_url } = req.body;
+  const data = db.getData();
+  const company = data.companies.find((c) => c.id === companyId);
+  if (!company) {
+    return res.status(404).json({ error: 'Empresa não encontrada.' });
+  }
+
+  if (drive_folder_id !== undefined) company.drive_folder_id = drive_folder_id || null;
+  if (drive_folder_url !== undefined) company.drive_folder_url = drive_folder_url || null;
+  company.updated_at = new Date().toISOString();
+
+  db.persist();
+  res.json({ success: true, company });
 });
 
 // Players Management
@@ -1576,11 +1611,16 @@ apiRouter.post('/company/media', requireAuth, requireRole('company'), (req: Auth
   const company = data.companies.find((c) => c.id === companyId);
   const plan = data.plans.find((p) => p.id === company?.plan_id);
 
-  // Check quota limit
+  // Check quota limit for media per company (custom limit takes priority over plan)
   const currentCount = data.media.filter((m) => m.company_id === companyId).length;
-  if (plan && currentCount >= plan.max_storage) {
+  const maxMedia =
+    company?.max_media !== undefined && company.max_media !== null
+      ? Number(company.max_media)
+      : (plan?.max_media || plan?.max_storage || 20);
+
+  if (currentCount >= maxMedia) {
     return res.status(400).json({
-      error: `Limite de mídias atingido (${currentCount}/${plan.max_storage}). Faça upgrade do plano contratado.`,
+      error: `Limite de mídias atingido (${currentCount}/${maxMedia}). Remova mídias antigas ou solicite ao administrador a ampliação da cota deste cliente.`,
     });
   }
 

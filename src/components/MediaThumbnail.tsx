@@ -11,6 +11,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { Media } from '../types';
+import { resolveMediaDisplayUrl } from '../lib/googleDrive';
 
 interface MediaThumbnailProps {
   media: Media | {
@@ -97,6 +98,8 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       : aspectRatio === 'square'
       ? 'aspect-square'
       : 'h-full';
+
+  const displayUrl = resolveMediaDisplayUrl(media.file_url);
 
   // Weather & Clock Widget
   if (media.type === 'weather_clock') {
@@ -212,7 +215,7 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
           <>
             <video
               ref={videoRef}
-              src={media.file_url}
+              src={displayUrl}
               muted
               playsInline
               preload="metadata"
@@ -290,7 +293,7 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
     >
       {!hasError ? (
         <img
-          src={media.file_url}
+          src={displayUrl}
           alt={media.name}
           referrerPolicy="no-referrer"
           onError={() => setHasError(true)}

@@ -57,6 +57,7 @@ import {
   getCachedToken,
   requestGoogleLogin,
   makeDriveFilePublic,
+  resolveMediaDisplayUrl,
 } from '../lib/googleDrive';
 
 interface CompanyDashboardProps {
@@ -818,6 +819,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
   const handleSaveMedia = async (e: React.FormEvent) => {
     e.preventDefault();
+    const currentMediaCount = mediaList.length;
+    const maxMediaLimit = stats?.limits?.max_media || stats?.limits?.max_storage || 20;
+    if (currentMediaCount >= maxMediaLimit) {
+      showToast(
+        'error',
+        `Limite de mídias atingido para seu plano (${currentMediaCount}/${maxMediaLimit}). Remova mídias obsoletas ou solicite aumento de cota ao administrador.`
+      );
+      return;
+    }
+
     try {
       setIsUploadingMedia(true);
       let targetFileUrl = mediaForm.file_url;
@@ -908,7 +919,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             status: 'completed',
           });
 
-          targetFileUrl = uploadRes.webViewLink;
+          // Also persist the client folder URL if not yet saved on the company record
+          if (structure?.clientFolder?.webViewLink && !stats?.drive_folder_url) {
+            api.updateCompanyDriveFolder({
+              drive_folder_id: structure.clientFolder.id,
+              drive_folder_url: structure.clientFolder.webViewLink,
+            }).catch(() => {});
+          }
+
+          targetFileUrl = uploadRes.directStreamLink || uploadRes.webViewLink;
         }
       } else if (mediaSourceType === 'weather_clock') {
         targetFileUrl = 'widget:weather_clock';
@@ -924,6 +943,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           setIsUploadingMedia(false);
           return;
         }
+        targetFileUrl = resolveMediaDisplayUrl(targetFileUrl);
       }
 
       await api.uploadCompanyMedia({
@@ -1325,19 +1345,25 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Storage limit */}
+              {/* Storage / Media limit */}
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Mídias em Armazenamento</span>
+                  <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Cota de Mídias (Google Drive / Nuvem)</span>
                   <span className="font-semibold text-white">
-                    {stats.mediaCount} / {stats.limits.max_storage}
+                    {stats.mediaCount} / {stats.limits.max_media || stats.limits.max_storage || 20}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-700/60 overflow-hidden">
                   <div
-                    className="h-full bg-amber-500 rounded-full"
+                    className={`h-full rounded-full ${
+                      (stats.mediaCount / (stats.limits.max_media || stats.limits.max_storage || 20)) >= 1
+                        ? 'bg-rose-500'
+                        : (stats.mediaCount / (stats.limits.max_media || stats.limits.max_storage || 20)) >= 0.8
+                        ? 'bg-amber-500'
+                        : 'bg-blue-500'
+                    }`}
                     style={{
-                      width: `${Math.min(100, (stats.mediaCount / stats.limits.max_storage) * 100)}%`,
+                      width: `${Math.min(100, (stats.mediaCount / (stats.limits.max_media || stats.limits.max_storage || 20)) * 100)}%`,
                     }}
                   />
                 </div>
@@ -2093,6 +2119,111 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <UploadCloud className="h-4 w-4" />
                 <span>Cadastrar Mídia</span>
               </button>
+            </div>
+          </div>
+
+          {/* PAINEL DE STATUS GOOGLE DRIVE & COTA DE MÍDIAS POR CLIENTE */}
+          <div className="rounded-xl border border-slate-700/80 bg-slate-850 p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-700/60">
+              {/* LADO ESQUERDO: INTEGRAÇÃO COM GOOGLE DRIVE & PASTAS DEDICADAS */}
+              <div className="space-y-3 md:pr-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                      <Folder className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">Google Drive do Cliente</h4>
+                      <p className="text-[11px] text-slate-400">Pastas dedicadas e separadas por empresa</p>
+                    </div>
+                  </div>
+
+                  {!getCachedToken() ? (
+                    <button
+                      type="button"
+                      onClick={requestGoogleLogin}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition cursor-pointer shadow-xs"
+                    >
+                      <UploadCloud className="h-3.5 w-3.5" />
+                      <span>Conectar Drive</span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700/80 text-emerald-400 text-[11px] font-semibold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Drive Conectado
+                    </span>
+                  )}
+                </div>
+
+                <div className="rounded-lg bg-slate-900/80 border border-slate-800 p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400 text-[11px]">Pasta Raiz:</span>
+                    <span className="font-mono text-[11px] font-bold text-white truncate max-w-[200px]">
+                      MÍDIA INDOOR / {companyInfo?.name || 'Cliente'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span className="text-slate-400 text-[11px]">Subpastas do Cliente:</span>
+                    <span className="text-[11px] text-blue-400 font-medium">📸 Fotos e Mídias • 📄 Documentos</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+                    Todas as mídias salvas via Drive são direcionadas automaticamente para a pasta exclusiva deste cliente, sem misturar com outros estabelecimentos.
+                  </p>
+                </div>
+              </div>
+
+              {/* LADO DIREITO: LIMITAÇÃO DE MÍDIAS POR CLIENTE (COTA) */}
+              <div className="space-y-3 pt-4 md:pt-0 md:pl-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-purple-600/20 text-purple-400 border border-purple-500/30">
+                      <Film className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">Cota de Mídias Cadastradas</h4>
+                      <p className="text-[11px] text-slate-400">Limite de arquivos permitidos neste plano</p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-white">
+                      {mediaList.length} / {stats?.limits?.max_media || stats?.limits?.max_storage || 20}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block uppercase tracking-wider">mídias</span>
+                  </div>
+                </div>
+
+                {/* BARRA DE PROGRESSO DA COTA */}
+                <div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-900 border border-slate-700/60 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20)
+                          ? 'bg-rose-500'
+                          : mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20) >= 0.8
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20)) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1 text-[10px]">
+                    <span className="text-slate-400">
+                      {Math.max(0, (stats?.limits?.max_media || stats?.limits?.max_storage || 20) - mediaList.length)} vaga(s) disponível(is)
+                    </span>
+                    {mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) && (
+                      <span className="font-bold text-rose-400">
+                        Limite de mídias atingido!
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -4262,37 +4393,50 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
               </div>
 
               {/* Sticky Footer */}
-              <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  disabled={isUploadingMedia}
-                  onClick={() => setMediaModalOpen(false)}
-                  className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 cursor-pointer disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    isUploadingMedia ||
-                    !mediaForm.name.trim() ||
-                    (mediaSourceType === 'device' && !selectedDeviceFile && !mediaForm.file_url) ||
-                    (mediaSourceType === 'url' && !mediaForm.file_url.trim())
-                  }
-                  className="flex-1 sm:flex-initial min-h-[44px] flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                >
-                  {isUploadingMedia ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Enviando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="h-3.5 w-3.5" />
-                      <span>Salvar Mídia</span>
-                    </>
+              <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/95 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs text-slate-400">
+                  <span>Cota: </span>
+                  <strong className={mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) ? 'text-rose-400 font-bold' : 'text-slate-200 font-semibold'}>
+                    {mediaList.length} / {stats?.limits?.max_media || stats?.limits?.max_storage || 20} mídias
+                  </strong>
+                  {mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) && (
+                    <span className="text-rose-400 ml-1.5 font-semibold text-[11px]">(Limite atingido)</span>
                   )}
-                </button>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    disabled={isUploadingMedia}
+                    onClick={() => setMediaModalOpen(false)}
+                    className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-lg border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-700 cursor-pointer disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      isUploadingMedia ||
+                      mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) ||
+                      !mediaForm.name.trim() ||
+                      (mediaSourceType === 'device' && !selectedDeviceFile && !mediaForm.file_url) ||
+                      (mediaSourceType === 'url' && !mediaForm.file_url.trim())
+                    }
+                    className="flex-1 sm:flex-initial min-h-[44px] flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-xs font-semibold text-white hover:bg-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {isUploadingMedia ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud className="h-3.5 w-3.5" />
+                        <span>Salvar Mídia</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

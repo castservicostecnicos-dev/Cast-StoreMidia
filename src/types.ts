@@ -27,8 +27,10 @@ export interface Company {
   status: 'active' | 'inactive';
   player_count?: number;
   operator_count?: number;
+  media_count?: number;
   max_players?: number;
   max_operators?: number;
+  max_media?: number;
   is_custom_limits?: boolean;
   created_at: string;
   updated_at: string;
@@ -42,6 +44,7 @@ export interface Plan {
   description: string;
   max_players: number;
   max_operators: number;
+  max_media?: number;
   max_storage: number;
   monthly_price: number;
   active: boolean;
@@ -203,10 +206,13 @@ export interface CompanyStats {
   playlistsCount: number;
   mediaCount: number;
   plan: Plan | null;
+  drive_folder_url?: string;
+  drive_folder_id?: string;
   limits: {
     max_players: number;
     max_operators: number;
     max_storage: number;
+    max_media: number;
   };
 }
 

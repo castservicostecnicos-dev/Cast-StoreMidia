@@ -19,6 +19,7 @@ import {
 import { Media } from '../types';
 import { WeatherClockMedia } from './WeatherClockMedia';
 import { RssNewsMedia } from './RssNewsMedia';
+import { resolveMediaDisplayUrl } from '../lib/googleDrive';
 
 interface MediaPreviewModalProps {
   media: Media | null;
@@ -120,7 +121,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
             <div className="w-full h-full flex flex-col items-center justify-center bg-black relative">
               <video
                 ref={videoRef}
-                src={media.file_url}
+                src={resolveMediaDisplayUrl(media.file_url)}
                 autoPlay
                 controls
                 playsInline
@@ -142,7 +143,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({
           {media.type === 'image' && (
             <div className="w-full h-full flex items-center justify-center p-2 bg-radial from-slate-950 to-black overflow-auto">
               <img
-                src={media.file_url}
+                src={resolveMediaDisplayUrl(media.file_url)}
                 alt={media.name}
                 referrerPolicy="no-referrer"
                 onLoad={(e) => {

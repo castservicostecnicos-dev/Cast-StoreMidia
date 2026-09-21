@@ -137,6 +137,11 @@ export const api = {
 
   // Company
   getCompanyStats: () => request<CompanyStats>('/company/stats'),
+  updateCompanyDriveFolder: (data: { drive_folder_id?: string; drive_folder_url?: string }) =>
+    request<{ success: boolean; company: Company }>('/company/drive-folder', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 
   getCompanyPlayers: () => request<Player[]>('/company/players'),
   createCompanyPlayer: (data: Partial<Player> & { password?: string }) =>

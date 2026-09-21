@@ -29,6 +29,7 @@ import { PlayerOrientation, WeatherData } from '../types';
 import { WeatherClockMedia } from '../components/WeatherClockMedia';
 import { RssNewsMedia } from '../components/RssNewsMedia';
 import { cleanRssText } from '../lib/rssCleaner';
+import { resolveMediaDisplayUrl } from '../lib/googleDrive';
 
 interface PlayerViewProps {
   onExit?: () => void;
@@ -70,13 +71,7 @@ interface ActiveCall {
 
 function resolveMediaUrl(url: string | undefined): string {
   if (!url) return '';
-  if (url.includes('drive.google.com')) {
-    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
-    }
-  }
-  return url;
+  return resolveMediaDisplayUrl(url);
 }
 
 export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCode, overridePlayerToken }) => {

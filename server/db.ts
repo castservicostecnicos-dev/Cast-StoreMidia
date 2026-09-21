@@ -40,6 +40,7 @@ export interface Company {
   status: 'active' | 'inactive';
   max_players?: number;
   max_operators?: number;
+  max_media?: number;
   created_at: string;
   updated_at: string;
   drive_folder_id?: string;
@@ -52,6 +53,7 @@ export interface Plan {
   description: string;
   max_players: number;
   max_operators: number;
+  max_media?: number;
   max_storage: number;
   monthly_price: number;
   active: boolean;

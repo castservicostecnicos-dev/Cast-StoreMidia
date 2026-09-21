@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   Download,
   Upload,
+  Folder,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { Company, Plan, AdminStats, MediaIntegrityAuditReport } from '../types';
@@ -209,6 +210,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     plan_id: string;
     max_players: number | string;
     max_operators: number | string;
+    max_media: number | string;
+    drive_folder_url?: string;
     start_date: string;
     due_date: string;
     password: string;
@@ -225,6 +228,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     plan_id: '',
     max_players: '',
     max_operators: '',
+    max_media: '',
+    drive_folder_url: '',
     start_date: new Date().toISOString().split('T')[0],
     due_date: '',
     password: '',
@@ -395,6 +400,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         plan_id: company.plan_id || (plans[0]?.id || ''),
         max_players: company.max_players !== undefined && company.max_players !== null ? company.max_players : '',
         max_operators: company.max_operators !== undefined && company.max_operators !== null ? company.max_operators : '',
+        max_media: company.max_media !== undefined && company.max_media !== null ? company.max_media : '',
+        drive_folder_url: company.drive_folder_url || '',
         start_date: company.start_date || '',
         due_date: company.due_date || '',
         password: '',
@@ -415,6 +422,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         plan_id: defaultPlan?.id || '',
         max_players: '',
         max_operators: '',
+        max_media: '',
+        drive_folder_url: '',
         start_date: new Date().toISOString().split('T')[0],
         due_date: '',
         password: '',
@@ -432,6 +441,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ...companyForm,
         max_players: companyForm.max_players !== '' ? Number(companyForm.max_players) : undefined,
         max_operators: companyForm.max_operators !== '' ? Number(companyForm.max_operators) : undefined,
+        max_media: companyForm.max_media !== '' ? Number(companyForm.max_media) : undefined,
       };
       if (editingCompany) {
         await api.updateCompany(editingCompany.id, payload);
@@ -1542,9 +1552,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   {/* Detalhes de Quotas e Contato */}
-                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/70 p-3 rounded-lg border border-slate-700/60">
+                  <div className="grid grid-cols-3 gap-2 text-xs bg-slate-900/70 p-3 rounded-lg border border-slate-700/60">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Telas / Players</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Telas</span>
                       <span className="text-white font-semibold">
                         {c.player_count || 0} {c.max_players !== undefined ? `/ ${c.max_players}` : ''}
                       </span>
@@ -1552,17 +1562,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Operadores</span>
                       {c.max_operators === 0 ? (
-                        <span className="text-amber-400 font-semibold text-[11px]">Sem operador (Show)</span>
+                        <span className="text-amber-400 font-semibold text-[11px]">Sem op.</span>
                       ) : (
                         <span className="text-white font-semibold">
                           {c.operator_count || 0} {c.max_operators !== undefined ? `/ ${c.max_operators}` : ''}
                         </span>
                       )}
                     </div>
-                    <div className="col-span-2 pt-2 border-t border-slate-800 text-slate-400 text-[11px] flex flex-wrap items-center justify-between gap-1">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Mídias (Drive)</span>
+                      <span className="text-white font-semibold">
+                        {c.media_count || 0} / {c.max_media || 20}
+                      </span>
+                    </div>
+                    <div className="col-span-3 pt-2 border-t border-slate-800 text-slate-400 text-[11px] flex flex-wrap items-center justify-between gap-1">
                       <span className="truncate">{c.email}</span>
                       {c.due_date && <span className="shrink-0 font-mono text-slate-300">Vence: {c.due_date}</span>}
                     </div>
+                    {c.drive_folder_url && (
+                      <div className="col-span-3 pt-1">
+                        <a
+                          href={c.drive_folder_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
+                        >
+                          <Folder className="h-3.5 w-3.5 text-blue-400" />
+                          <span>Abrir Pasta no Google Drive</span>
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Botões de Ação para Celular (Área de toque otimizada >= 44px) */}
@@ -1662,14 +1692,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <p className="text-slate-300 font-medium">
-                          {c.player_count || 0}{c.max_players !== undefined ? `/${c.max_players}` : ''} players |{' '}
+                        <p className="text-slate-300 font-medium text-xs">
+                          {c.player_count || 0}{c.max_players !== undefined ? `/${c.max_players}` : ''} players •{' '}
                           {c.max_operators === 0 ? (
-                            <span className="text-amber-400 font-semibold text-[11px]">Sem operador</span>
+                            <span className="text-amber-400 font-semibold text-[11px]">0 op.</span>
                           ) : (
-                            `${c.operator_count || 0}${c.max_operators !== undefined ? `/${c.max_operators}` : ''} operadores`
+                            `${c.operator_count || 0}${c.max_operators !== undefined ? `/${c.max_operators}` : ''} ops`
                           )}
                         </p>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                          <span>Mídias: <strong className="text-slate-200">{c.media_count || 0} / {c.max_media || 20}</strong></span>
+                          {c.drive_folder_url && (
+                            <a
+                              href={c.drive_folder_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-0.5"
+                              title="Abrir pasta no Google Drive"
+                            >
+                              <Folder className="h-3 w-3" />
+                              <span>Drive</span>
+                            </a>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <span
@@ -2177,10 +2222,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <Sparkles className="h-3.5 w-3.5 text-purple-400" />
                         <span>Definição Livre de Operadores e Telas (Planos Especiais)</span>
                       </div>
-                      {(companyForm.max_players !== '' || companyForm.max_operators !== '') && (
+                      {(companyForm.max_players !== '' || companyForm.max_operators !== '' || companyForm.max_media !== '') && (
                         <button
                           type="button"
-                          onClick={() => setCompanyForm({ ...companyForm, max_players: '', max_operators: '' })}
+                          onClick={() => setCompanyForm({ ...companyForm, max_players: '', max_operators: '', max_media: '' })}
                           className="text-[10px] text-purple-400 hover:text-purple-200 underline cursor-pointer"
                         >
                           Usar Padrão do Plano
@@ -2188,9 +2233,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       )}
                     </div>
                     <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Permite definir livremente a quantidade exata de telas e operadores para este cliente (sem a trava fixa de 4 operadores por tela). Deixe em branco caso deseje usar os limites do plano selecionado.
+                      Permite definir livremente a quantidade exata de telas, operadores e cota máxima de mídias para este cliente. Deixe em branco caso deseje usar os limites do plano selecionado.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
                           Qtd. Telas / Players (Livre)
@@ -2203,7 +2248,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           placeholder={
                             (() => {
                               const p = plans.find((pl) => pl.id === companyForm.plan_id);
-                              return p ? `Padrão do plano: ${p.max_players} telas` : 'Ex: 5';
+                              return p ? `Padrão: ${p.max_players} telas` : 'Ex: 5';
                             })()
                           }
                           className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
@@ -2212,7 +2257,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
-                          Qtd. Operadores de Chamada (Livre)
+                          Qtd. Operadores (Livre)
                         </label>
                         <input
                           type="number"
@@ -2222,12 +2267,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           placeholder={
                             (() => {
                               const p = plans.find((pl) => pl.id === companyForm.plan_id);
-                              return p ? `Padrão do plano: ${p.max_operators} operadores` : 'Ex: 10';
+                              return p ? `Padrão: ${p.max_operators} ops` : 'Ex: 10';
                             })()
                           }
                           className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
+                          Limite de Mídias (Cota Livre)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={companyForm.max_media}
+                          onChange={(e) => setCompanyForm({ ...companyForm, max_media: e.target.value })}
+                          placeholder={
+                            (() => {
+                              const p = plans.find((pl) => pl.id === companyForm.plan_id);
+                              return p ? `Padrão: ${p.max_media || p.max_storage || 20} mídias` : 'Ex: 50';
+                            })()
+                          }
+                          className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Pasta Dedicada no Google Drive */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1.5">
+                        <Folder className="h-3.5 w-3.5 text-blue-400" />
+                        <span>Link da Pasta no Google Drive (Opcional)</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={companyForm.drive_folder_url || ''}
+                        onChange={(e) => setCompanyForm({ ...companyForm, drive_folder_url: e.target.value })}
+                        placeholder="https://drive.google.com/drive/folders/... (Preenchido automaticamente ao conectar ou crie manualmente)"
+                        className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Cada cliente possui isolamento total. O sistema cria automaticamente a pasta <strong className="text-slate-300">MÍDIA INDOOR / [Nome]</strong> ou você pode colar aqui o link de uma pasta existente.
+                      </p>
                     </div>
                   </div>
                 </div>

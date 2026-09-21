@@ -369,6 +369,36 @@ export const getDriveDirectStreamUrl = (fileId: string): string => {
 };
 
 /**
+ * Resolves any Google Drive web or view link to a direct streaming/image CDN URL.
+ * Supports file/d/ID, open?id=ID, uc?id=ID, and passes other URLs intact.
+ */
+export const resolveMediaDisplayUrl = (url: string | undefined | null): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed || trimmed.startsWith('widget:') || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  // Already a direct lh3 googleusercontent URL
+  if (trimmed.includes('lh3.googleusercontent.com/d/')) {
+    return trimmed;
+  }
+
+  // Google Drive standard links
+  if (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com')) {
+    const fileIdMatch =
+      trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+      trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+      trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
+    }
+  }
+
+  return trimmed;
+};
+
+/**
  * Makes a Google Drive file accessible with public view permissions
  */
 export const makeDriveFilePublic = async (
