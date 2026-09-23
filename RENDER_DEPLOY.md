@@ -41,4 +41,22 @@ Se preferir criar o serviço manualmente no Render:
     - `FIREBASE_PROJECT_ID`: `gen-lang-client-0937994667`
     - `FIREBASE_API_KEY`: sua chave de API do Firebase
     - `FIRESTORE_DATABASE_ID`: `ai-studio-mdiaindoor-0ee6f26d-4225-42ad-910a-5d51615f2900`
-- **Mídias e Arquivos**: As mídias podem ser vinculadas diretamente pelo **Google Drive** de cada empresa (armazena os vídeos e imagens no Google Drive sem consumir disco do Render) ou via uploads locais. Caso utilize uploads locais no plano gratuito do Render, recomenda-se adicionar um **Persistent Disk** para a pasta `/uploads`.
+---
+
+### Web Service vs. Static Site no Render (Dúvida Frequente):
+- **O app pode rodar como um "Static Site" puro (sem backend)?**
+  - **NÃO como um serviço isolado**. Um "Static Site" serve apenas arquivos HTML/JS/CSS estáticos e **não executa Node.js**.
+  - Este aplicativo necessita do servidor Node.js/Express (`server.ts`) para processar as rotas de API vitais:
+    1. **Autenticação**: login com validação de senhas com hash e controle de sessões.
+    2. **Monitoramento e Heartbeat dos Players**: comunicação contínua das TVs com o servidor.
+    3. **Tempo Real (SSE)**: chamada de senhas pelos operadores transmitida instantaneamente para a TV.
+    4. **Sincronização com o Firestore**: gestão de dados, planos, cotas e feeds RSS.
+    5. **Uploads de Mídia Locais**: recebimento e armazenamento de arquivos no servidor.
+  - Portanto, alterar o tipo de serviço no Render para "Static Site" sem um backend causará erros `404 Not Found` em todas as ações do sistema.
+
+- **É possível usar a arquitetura híbrida (Frontend em Static Site + Backend em Web Service)?**
+  - **SIM!** O código já foi preparado para isso:
+    - O backend possui suporte completo a **CORS** ativado para qualquer origem.
+    - O frontend aceita a variável `VITE_API_BASE_URL` para apontar para o seu Web Service Node.js (ex: `https://meu-backend.onrender.com/api`).
+    - Assim, se você criar um **Static Site** no Render apenas para o frontend, basta configurar a variável de ambiente `VITE_API_BASE_URL` nele apontando para a URL do seu **Web Service** de backend!
+  - **Recomendação mais simples:** Manter como **Web Service** unificado (Opção 1 ou 2 acima), onde frontend e backend rodam juntos no mesmo serviço sem custo adicional nem necessidade de gerenciar dois serviços.

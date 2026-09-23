@@ -23,7 +23,7 @@ import {
   Star,
   Thermometer,
 } from 'lucide-react';
-import { api, getStoredToken } from '../lib/api';
+import { api, getStoredToken, API_BASE_URL } from '../lib/api';
 import { playCallChime, playCallAlert, stopCallAlert, unlockAudio } from '../lib/audio';
 import { PlayerOrientation, WeatherData } from '../types';
 import { WeatherClockMedia } from '../components/WeatherClockMedia';
@@ -458,7 +458,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
     if (playerCode) params.append('code', playerCode);
     if (companyId) params.append('companyId', companyId);
 
-    const sseUrl = `/api/realtime/stream?${params.toString()}`;
+    const sseUrl = `${API_BASE_URL}/realtime/stream?${params.toString()}`;
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = (event) => {

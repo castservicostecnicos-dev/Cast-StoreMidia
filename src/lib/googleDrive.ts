@@ -379,6 +379,16 @@ export const resolveMediaDisplayUrl = (url: string | undefined | null): string =
     return trimmed;
   }
 
+  // Local uploads when frontend is running on a separated static site
+  if (trimmed.startsWith('/uploads/')) {
+    const backendBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+    if (backendBase && backendBase.startsWith('http')) {
+      const origin = backendBase.replace(/\/api\/?$/, '');
+      return `${origin}${trimmed}`;
+    }
+    return trimmed;
+  }
+
   // Already a direct lh3 googleusercontent URL
   if (trimmed.includes('lh3.googleusercontent.com/d/')) {
     return trimmed;

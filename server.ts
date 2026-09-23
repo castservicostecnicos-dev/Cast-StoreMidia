@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './server/routes.js';
 import { db, uploadsDir } from './server/db.js';
@@ -8,6 +9,16 @@ import { db, uploadsDir } from './server/db.js';
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Enable CORS so frontend can run as a separate static site if desired
+  app.use(
+    cors({
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      exposedHeaders: ['Content-Disposition'],
+    })
+  );
 
   // Initialize and restore database from Firebase Firestore
   try {

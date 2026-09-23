@@ -2,6 +2,11 @@ import { Role, User, Company, Plan, Player, Operator, Playlist, Media, RssFeed, 
 
 const TOKEN_KEY = 'indoor_media_token';
 
+// Support decoupled Static Site deployment pointing to a remote backend service
+export const API_BASE_URL: string = (
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '') || '/api'
+);
+
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -25,7 +30,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`/api${endpoint}`, {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
   });
@@ -84,7 +89,7 @@ export const api = {
       };
     }>('/admin/firestore/sync', { method: 'POST' }),
   exportBackup: () => {
-    window.location.href = '/api/admin/backup/export';
+    window.location.href = `${API_BASE_URL}/admin/backup/export`;
   },
   importBackup: (backup: any) =>
     request<{ success: boolean; message: string }>('/admin/backup/import', {
