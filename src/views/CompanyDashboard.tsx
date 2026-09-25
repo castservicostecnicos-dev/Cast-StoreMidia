@@ -46,7 +46,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
+import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument, DriveSettings, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
 import { MediaThumbnail } from '../components/MediaThumbnail';
@@ -58,6 +58,8 @@ import {
   requestGoogleLogin,
   makeDriveFilePublic,
   resolveMediaDisplayUrl,
+  dataUrlToBlob,
+  hasActiveSession,
 } from '../lib/googleDrive';
 
 interface CompanyDashboardProps {
@@ -236,6 +238,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     }
   };
 
+  const [driveSettings, setDriveSettings] = useState<DriveSettings>({
+    connected: false,
+    account_email: 'cast.servicostecnicos@gmail.com',
+    account_name: 'Cast Serviços Técnicos',
+    root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
+  });
+  const [hasDriveToken, setHasDriveToken] = useState(false);
+  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+  const [saveToGoogleDrive, setSaveToGoogleDrive] = useState(true);
+
   const [selectedDeviceFile, setSelectedDeviceFile] = useState<{
     file: File | null;
     dataUrl: string;
@@ -286,13 +298,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const loadData = async () => {
     try {
       setLoading(true);
-      const [s, pl, op, py, md, rs] = await Promise.all([
+      const [s, pl, op, py, md, rs, dr] = await Promise.all([
         api.getCompanyStats(),
         api.getCompanyPlayers(),
         api.getCompanyOperators(),
         api.getCompanyPlaylists(),
         api.getCompanyMedia(),
         api.getCompanyRss(),
+        api.getDriveSettings().catch(() => ({ status: 'ok', settings: driveSettings })),
       ]);
       setStats(s);
       setPlayers(pl);
@@ -300,6 +313,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       setPlaylists(py);
       setMediaList(md);
       setRssList(rs);
+      if (dr && dr.settings) {
+        setDriveSettings(dr.settings);
+      }
+      setHasDriveToken(hasActiveSession());
 
       // Load cached integrity status if any
       api.getMediaIntegrityStatus().then((rep) => {
@@ -309,6 +326,136 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       showToast('error', err.message || 'Erro ao carregar dados da empresa.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectGoogleDrive = async () => {
+    try {
+      setIsConnectingDrive(true);
+      const authResult = await requestGoogleLogin();
+      if (!authResult) {
+        // User closed or dismissed the popup
+        return;
+      }
+      if (authResult?.user && authResult.accessToken) {
+        setHasDriveToken(true);
+        const updated: Partial<DriveSettings> = {
+          connected: true,
+          account_email: authResult.user.email || undefined,
+          account_name: authResult.user.displayName || undefined,
+          account_photo: authResult.user.photoURL || undefined,
+        };
+        setDriveSettings((prev) => ({ ...prev, ...updated }));
+        await api.updateDriveSettings(updated).catch(() => {});
+        showToast('success', `Google Drive conectado com sucesso: ${authResult.user.email}`);
+
+        // Automatically create or verify company folder hierarchy
+        const clientName = companyInfo?.name || 'Cliente';
+        const structure = await ensureClientFolders(authResult.accessToken, clientName);
+        if (structure?.clientFolder?.webViewLink) {
+          await api.updateCompanyDriveFolder({
+            drive_folder_id: structure.clientFolder.id,
+            drive_folder_url: structure.clientFolder.webViewLink,
+          }).catch(() => {});
+          if (stats) {
+            setStats((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    drive_folder_id: structure.clientFolder.id,
+                    drive_folder_url: structure.clientFolder.webViewLink,
+                  }
+                : prev
+            );
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user' && !err?.message?.includes('popup-closed-by-user')) {
+        console.error('Erro ao conectar Google Drive:', err);
+        showToast('error', err.message || 'Falha ao conectar conta Google.');
+      }
+    } finally {
+      setIsConnectingDrive(false);
+    }
+  };
+
+  const handleSyncMediaToDrive = async (media: Media) => {
+    let token = getCachedToken();
+    if (!token) {
+      showToast('info', 'Conecte sua conta do Google Drive para autorizar o envio.');
+      try {
+        const authResult = await requestGoogleLogin();
+        if (!authResult?.accessToken) return;
+        token = authResult.accessToken;
+        setHasDriveToken(true);
+      } catch {
+        return;
+      }
+    }
+
+    try {
+      showToast('info', `Enviando "${media.name}" para a pasta do Google Drive...`);
+      const fileUrl = resolveMediaDisplayUrl(media.file_url);
+      const resp = await fetch(fileUrl);
+      if (!resp.ok) throw new Error('Não foi possível obter a mídia original para enviar ao Drive.');
+      const blob = await resp.blob();
+
+      const clientName = companyInfo?.name || 'Cliente';
+      const structure = await ensureClientFolders(token, clientName);
+      const isPhoto = media.type !== 'video';
+      const targetFolder = isPhoto
+        ? structure.categoryFolders.photos
+        : structure.categoryFolders.documents;
+      const prefix = isPhoto ? 'FOTO' : 'VID';
+      const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
+      const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
+      const ext = media.type === 'video' ? 'mp4' : 'jpg';
+      const sanitizedFileName = `${uniqueCode}_${media.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+
+      const driveRes = await uploadFileToDrive(
+        token,
+        blob,
+        sanitizedFileName,
+        targetFolder.id,
+        {
+          description: `Mídia sincronizada para o Google Drive (${uniqueCode})`,
+          uniqueCode,
+        }
+      );
+
+      await api.updateCompanyMedia(media.id, {
+        file_url: driveRes.directStreamLink || driveRes.webViewLink,
+        drive_file_id: driveRes.id,
+        drive_view_url: driveRes.webViewLink,
+        drive_download_url: driveRes.webContentLink,
+        drive_folder_id: targetFolder.id,
+        unique_code: uniqueCode,
+        source: 'drive',
+      });
+
+      await api.createDriveDocument({
+        unique_code: uniqueCode,
+        company_id: companyInfo?.id || '',
+        category: isPhoto ? 'photo' : 'document',
+        title: media.name,
+        description: `Mídia de exibição sincronizada com Google Drive (${uniqueCode})`,
+        file_name: sanitizedFileName,
+        file_size: blob.size,
+        mime_type: blob.type || (isPhoto ? 'image/jpeg' : 'video/mp4'),
+        drive_file_id: driveRes.id,
+        drive_folder_id: targetFolder.id,
+        drive_view_url: driveRes.webViewLink,
+        drive_download_url: driveRes.webContentLink,
+        status: 'completed',
+      }).catch(() => {});
+
+      showToast('success', `Mídia "${media.name}" salva com sucesso no Google Drive na pasta "${clientName}"!`);
+      loadData();
+    } catch (err: any) {
+      console.error('Error syncing media to Drive:', err);
+      showToast('error', err.message || 'Falha ao sincronizar mídia com Google Drive.');
     }
   };
 
@@ -832,6 +979,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     try {
       setIsUploadingMedia(true);
       let targetFileUrl = mediaForm.file_url;
+      let driveMediaData: Partial<Media> = {};
 
       if (mediaSourceType === 'device') {
         if (!selectedDeviceFile) {
@@ -840,13 +988,130 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           return;
         }
 
-        // Upload file directly to server
-        const uploadRes = await api.uploadFile(
-          selectedDeviceFile.dataUrl,
-          selectedDeviceFile.name,
-          selectedDeviceFile.type
-        );
-        targetFileUrl = uploadRes.url;
+        // If Google Drive sync is enabled, save file directly into client's Google Drive folder
+        if (saveToGoogleDrive) {
+          let token = getCachedToken();
+
+          if (token) {
+            const clientName = companyInfo?.name || 'Cliente';
+            const structure = await ensureClientFolders(token, clientName);
+            const isPhoto = !selectedDeviceFile.isVideo;
+            const targetFolder = isPhoto
+              ? structure.categoryFolders.photos
+              : structure.categoryFolders.documents;
+            const prefix = isPhoto ? 'FOTO' : 'VID';
+            const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
+            const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
+            const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
+            const sanitizedFileName = `${uniqueCode}_${selectedDeviceFile.name.replace(/\s+/g, '_')}`;
+
+            const fileToUpload = selectedDeviceFile.file || dataUrlToBlob(selectedDeviceFile.dataUrl);
+
+            const uploadRes = await uploadFileToDrive(
+              token,
+              fileToUpload,
+              sanitizedFileName,
+              targetFolder.id,
+              {
+                description: `Mídia indoor carregada pela empresa (${uniqueCode})`,
+                uniqueCode,
+              }
+            );
+
+            // Catalog in Drive Documents
+            await api.createDriveDocument({
+              unique_code: uniqueCode,
+              company_id: companyInfo?.id || '',
+              category: isPhoto ? 'photo' : 'document',
+              title: mediaForm.name.trim() || selectedDeviceFile.name,
+              description: `Mídia para exibição em TVs (${uniqueCode})`,
+              file_name: selectedDeviceFile.name,
+              file_size: selectedDeviceFile.file?.size,
+              mime_type: selectedDeviceFile.type,
+              drive_file_id: uploadRes.id,
+              drive_folder_id: targetFolder.id,
+              drive_view_url: uploadRes.webViewLink,
+              drive_download_url: uploadRes.webContentLink,
+              status: 'completed',
+            }).catch(() => {});
+
+            // Persist client folder URL if needed
+            if (structure?.clientFolder?.webViewLink && !stats?.drive_folder_url) {
+              api.updateCompanyDriveFolder({
+                drive_folder_id: structure.clientFolder.id,
+                drive_folder_url: structure.clientFolder.webViewLink,
+              }).catch(() => {});
+            }
+
+            targetFileUrl = uploadRes.directStreamLink || uploadRes.webViewLink;
+
+            driveMediaData = {
+              drive_file_id: uploadRes.id,
+              drive_folder_id: targetFolder.id,
+              drive_view_url: uploadRes.webViewLink,
+              drive_download_url: uploadRes.webContentLink,
+              unique_code: uniqueCode,
+              source: 'drive',
+              file_size: selectedDeviceFile.file?.size,
+              mime_type: selectedDeviceFile.type,
+            };
+
+            // Local cache backup on server for offline player stability
+            api.uploadFile(
+              selectedDeviceFile.dataUrl,
+              selectedDeviceFile.name,
+              selectedDeviceFile.type
+            ).catch(() => {});
+          } else {
+            // Upload through the system's pre-registered Google Drive connection
+            const serverRes = await api.uploadCompanyMediaToDriveServer({
+              fileData: selectedDeviceFile.dataUrl,
+              filename: selectedDeviceFile.name,
+              mimeType: selectedDeviceFile.type,
+              name: mediaForm.name.trim() || selectedDeviceFile.name,
+              duration: Number(mediaForm.duration) || 10,
+            });
+
+            if (serverRes.savedToDrive && serverRes.media) {
+              showToast(
+                'success',
+                `Mídia "${serverRes.media.name}" salva com sucesso no Google Drive na pasta "${companyInfo?.name || 'Cliente'}"!`
+              );
+              setMediaModalOpen(false);
+              resetMediaModalState();
+              loadData();
+              return;
+            } else {
+              targetFileUrl = serverRes.media?.file_url || '';
+              driveMediaData = {
+                source: 'device',
+                file_size: selectedDeviceFile.file?.size,
+                mime_type: selectedDeviceFile.type,
+              };
+              showToast(
+                'success',
+                'Mídia salva no servidor local (Conecte a conta Google no painel para salvar no Drive).'
+              );
+              setMediaModalOpen(false);
+              resetMediaModalState();
+              loadData();
+              return;
+            }
+          }
+        } else {
+          // Upload file directly to server
+          const uploadRes = await api.uploadFile(
+            selectedDeviceFile.dataUrl,
+            selectedDeviceFile.name,
+            selectedDeviceFile.type
+          );
+          targetFileUrl = uploadRes.url;
+          driveMediaData = {
+            source: 'device',
+            file_size: selectedDeviceFile.file?.size,
+            mime_type: selectedDeviceFile.type,
+          };
+        }
       } else if (mediaSourceType === 'drive') {
         if (driveMediaTab === 'select') {
           if (!selectedDriveDocId) {
@@ -864,6 +1129,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           if (!mediaForm.name.trim()) {
             mediaForm.name = chosenDoc.title;
           }
+          driveMediaData = {
+            drive_file_id: chosenDoc.drive_file_id,
+            drive_folder_id: chosenDoc.drive_folder_id,
+            drive_view_url: chosenDoc.drive_view_url,
+            drive_download_url: chosenDoc.drive_download_url,
+            unique_code: chosenDoc.unique_code,
+            source: 'drive',
+            file_size: chosenDoc.file_size,
+            mime_type: chosenDoc.mime_type,
+          };
         } else {
           // Upload directly to Drive & link as Media
           if (!driveUploadFile) {
@@ -872,12 +1147,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             return;
           }
 
-          const token = getCachedToken();
+          let token = getCachedToken();
           if (!token) {
-            showToast('error', 'Conecte sua conta do Google Drive para autorizar o envio.');
-            requestGoogleLogin();
-            setIsUploadingMedia(false);
-            return;
+            showToast('info', 'Conecte sua conta do Google Drive para autorizar o envio.');
+            const authResult = await requestGoogleLogin();
+            if (!authResult?.accessToken) {
+              setIsUploadingMedia(false);
+              return;
+            }
+            token = authResult.accessToken;
+            setHasDriveToken(true);
           }
 
           const clientName = companyInfo?.name || 'Cliente';
@@ -928,6 +1207,17 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           }
 
           targetFileUrl = uploadRes.directStreamLink || uploadRes.webViewLink;
+
+          driveMediaData = {
+            drive_file_id: uploadRes.id,
+            drive_folder_id: targetFolder.id,
+            drive_view_url: uploadRes.webViewLink,
+            drive_download_url: uploadRes.webContentLink,
+            unique_code: uniqueCode,
+            source: 'drive',
+            file_size: driveUploadFile.size,
+            mime_type: driveUploadFile.type,
+          };
         }
       } else if (mediaSourceType === 'weather_clock') {
         targetFileUrl = 'widget:weather_clock';
@@ -951,11 +1241,14 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         type: mediaSourceType === 'weather_clock' ? 'weather_clock' : mediaSourceType === 'rss' ? 'rss' : mediaForm.type,
         file_url: targetFileUrl,
         duration: Number(mediaForm.duration) || 10,
+        ...driveMediaData,
       });
 
       showToast(
         'success',
-        mediaSourceType === 'device'
+        driveMediaData.drive_file_id
+          ? `Mídia "${mediaForm.name.trim() || 'Nova Mídia'}" salva com sucesso no Google Drive na pasta "${companyInfo?.name || 'Cliente'}"!`
+          : mediaSourceType === 'device'
           ? 'Mídia carregada diretamente do dispositivo com sucesso!'
           : mediaSourceType === 'drive'
           ? 'Foto/Arquivo vinculado do Google Drive com sucesso!'
@@ -2426,7 +2719,22 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
 
                 <div className="p-4">
-                  <h4 className="font-bold text-white text-sm truncate" title={m.name}>{m.name}</h4>
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-bold text-white text-sm truncate flex-1" title={m.name}>{m.name}</h4>
+                    {m.drive_file_id && (
+                      <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800/70 text-blue-300 flex items-center gap-1" title="Armazenado no Google Drive da Empresa">
+                        <Folder className="h-3 w-3 text-blue-400" />
+                        Drive
+                      </span>
+                    )}
+                  </div>
+
+                  {m.unique_code && (
+                    <p className="text-[10px] font-mono text-slate-400 mt-1 flex items-center gap-1">
+                      <span className="text-slate-500">ID:</span> {m.unique_code}
+                    </p>
+                  )}
+
                   <div className="mt-2.5 flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/60">
                     <span className="flex items-center gap-1 font-medium">
                       <Clock className="h-3.5 w-3.5 text-slate-400" />
@@ -2434,6 +2742,30 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     </span>
 
                     <div className="flex items-center gap-1.5">
+                      {m.drive_view_url && (
+                        <a
+                          href={m.drive_view_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:text-blue-300 p-1.5 rounded-lg hover:bg-slate-700 transition cursor-pointer"
+                          title="Abrir arquivo no Google Drive"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+
+                      {!m.drive_file_id && m.source !== 'drive' && (
+                        <button
+                          type="button"
+                          onClick={() => handleSyncMediaToDrive(m)}
+                          className="text-amber-400 hover:text-amber-300 px-2 py-1 rounded-lg hover:bg-slate-700 transition cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
+                          title="Enviar este arquivo para a pasta da Empresa no Google Drive"
+                        >
+                          <Folder className="h-3 w-3" />
+                          <span className="hidden sm:inline">Drive</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setPreviewModalMedia(m)}
@@ -3843,6 +4175,101 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* CONFIGURAÇÃO DO GOOGLE DRIVE PARA O ARQUIVO CARREGADO */}
+                  <div className="mt-3.5 rounded-xl border border-blue-900/60 bg-blue-950/30 p-3.5 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="p-2 rounded-lg bg-blue-600/20 text-blue-400 shrink-0 mt-0.5">
+                          <Folder className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <label className="flex items-center gap-2 font-bold text-xs text-white cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={saveToGoogleDrive}
+                              onChange={(e) => setSaveToGoogleDrive(e.target.checked)}
+                              className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span>Salvar no Google Drive da Empresa</span>
+                          </label>
+                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                            Organiza o arquivo na nuvem com código único e subpastas de categorias (Fotos / Documentos).
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status da Conta Conectada */}
+                      {hasDriveToken || getCachedToken() ? (
+                        <span className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-700 text-emerald-300 text-[10px] font-bold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Drive Conectado
+                        </span>
+                      ) : driveSettings.connected ? (
+                        <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-950/80 border border-blue-700 text-blue-300 text-[10px] font-semibold">
+                          Conta Cadastrada
+                        </span>
+                      ) : (
+                        <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-950/70 border border-amber-800 text-amber-300 text-[10px] font-semibold">
+                          Não Conectado
+                        </span>
+                      )}
+                    </div>
+
+                    {saveToGoogleDrive && (
+                      <div className="pt-2 border-t border-blue-900/40 text-xs space-y-2">
+                        {driveSettings.connected && driveSettings.account_email ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-slate-400 font-medium">Conta Google Vinculada:</p>
+                              <p className="text-xs font-bold text-white truncate flex items-center gap-1.5 mt-0.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                                {driveSettings.account_email}
+                              </p>
+                              <p className="text-[10px] text-blue-300 mt-0.5 truncate">
+                                📁 Pasta: MÍDIA INDOOR / {companyInfo?.name || 'Empresa'} / {selectedDeviceFile?.isVideo ? '📄 Documentos' : '📸 Fotos'}
+                              </p>
+                            </div>
+                            {!hasDriveToken && !getCachedToken() && (
+                              <button
+                                type="button"
+                                onClick={handleConnectGoogleDrive}
+                                disabled={isConnectingDrive}
+                                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition cursor-pointer flex items-center gap-1"
+                              >
+                                {isConnectingDrive ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                                Autorizar Sessão
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-amber-950/30 border border-amber-800/40 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div>
+                              <p className="text-xs font-bold text-amber-300">
+                                Conecte a conta Google cadastrada
+                              </p>
+                              <p className="text-[11px] text-slate-300 mt-0.5">
+                                Conecte uma vez para permitir que o app salve seus arquivos automaticamente no Google Drive.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleConnectGoogleDrive}
+                              disabled={isConnectingDrive}
+                              className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                            >
+                              {isConnectingDrive ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Folder className="h-3.5 w-3.5" />
+                              )}
+                              <span>Conectar Google Drive</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

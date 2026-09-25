@@ -119,6 +119,14 @@ export interface Media {
   file_url: string;
   duration: number;
   active: boolean;
+  drive_file_id?: string;
+  drive_view_url?: string;
+  drive_download_url?: string;
+  drive_folder_id?: string;
+  unique_code?: string;
+  source?: 'drive' | 'device' | 'url' | 'rss' | 'weather_clock';
+  file_size?: number;
+  mime_type?: string;
   created_at: string;
   updated_at: string;
 }
@@ -355,6 +363,9 @@ export interface DriveSettings {
   root_folder_name?: string;
   root_folder_url?: string;
   last_synced_at?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expiry?: number;
 }
 
 export interface DatabaseSchema {
@@ -371,6 +382,16 @@ export interface DatabaseSchema {
   sub_clients: SubClient[];
   drive_documents: DriveDocument[];
   drive_settings: DriveSettings;
+  sessions?: AuthSession[];
+}
+
+export interface AuthSession {
+  token: string;
+  userId: string;
+  role: 'admin' | 'company' | 'operator' | 'player';
+  companyId: string | null;
+  playerId?: string;
+  createdAt: number;
 }
 
 export const DEFAULT_PLANS: Plan[] = [
@@ -581,6 +602,10 @@ class DatabaseStore {
           };
           changed = true;
         }
+        if (!this.data.sessions) {
+          this.data.sessions = [];
+          changed = true;
+        }
 
         // Ensure all players have a unique persistent access_token for direct URL auto-start
         if (this.data.players && Array.isArray(this.data.players)) {
@@ -650,6 +675,9 @@ class DatabaseStore {
         } else {
           // Restore cloud data
           this.data = cloudData;
+          if (!this.data.sessions) {
+            this.data.sessions = [];
+          }
           try {
             fs.writeFileSync(dbPath, JSON.stringify(this.data, null, 2), 'utf-8');
           } catch (e) {
@@ -1031,7 +1059,52 @@ class DatabaseStore {
         connected: false,
         root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
       },
+      sessions: [],
     };
+  }
+
+  // ==========================================
+  // SESSIONS MANAGEMENT (PERSISTENT SESSIONS)
+  // ==========================================
+  public getSession(token: string): AuthSession | undefined {
+    if (!token || !this.data.sessions) return undefined;
+    return this.data.sessions.find((s) => s.token === token);
+  }
+
+  public saveSession(session: AuthSession): void {
+    if (!this.data.sessions) {
+      this.data.sessions = [];
+    }
+    const idx = this.data.sessions.findIndex((s) => s.token === session.token);
+    if (idx >= 0) {
+      this.data.sessions[idx] = session;
+    } else {
+      this.data.sessions.push(session);
+    }
+    // Prune sessions older than 30 days to prevent bloat
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    if (this.data.sessions.length > 500) {
+      this.data.sessions = this.data.sessions.filter((s) => s.createdAt > thirtyDaysAgo);
+    }
+    this.save();
+  }
+
+  public removeSession(token: string): void {
+    if (!this.data.sessions) return;
+    const initialLen = this.data.sessions.length;
+    this.data.sessions = this.data.sessions.filter((s) => s.token !== token);
+    if (this.data.sessions.length !== initialLen) {
+      this.save();
+    }
+  }
+
+  public removeUserSessions(userId: string): void {
+    if (!this.data.sessions) return;
+    const initialLen = this.data.sessions.length;
+    this.data.sessions = this.data.sessions.filter((s) => s.userId !== userId);
+    if (this.data.sessions.length !== initialLen) {
+      this.save();
+    }
   }
 
   // ==========================================
@@ -1155,8 +1228,13 @@ class DatabaseStore {
     if (!this.data.drive_settings) {
       this.data.drive_settings = {
         connected: false,
+        account_email: 'cast.servicostecnicos@gmail.com',
+        account_name: 'Cast Serviços Técnicos',
         root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
       };
+    } else if (!this.data.drive_settings.account_email) {
+      this.data.drive_settings.account_email = 'cast.servicostecnicos@gmail.com';
+      this.data.drive_settings.account_name = this.data.drive_settings.account_name || 'Cast Serviços Técnicos';
     }
     return this.data.drive_settings;
   }

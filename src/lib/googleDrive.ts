@@ -18,11 +18,12 @@ const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive.file');
 provider.setCustomParameters({
   prompt: 'select_account',
+  login_hint: 'cast.servicostecnicos@gmail.com',
 });
 
 // Flag to track ongoing sign in flow
 let isSigningIn = false;
-// Strictly in-memory cache for OAuth access token as required by Google Workspace integration guidelines
+const SESSION_TOKEN_KEY = 'mindoors_gdrive_access_token';
 let cachedAccessToken: string | null = null;
 
 export interface DriveAccountInfo {
@@ -66,17 +67,55 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        // Token expired or page reloaded, prompt user to connect via DEV
-        if (onAuthFailure) onAuthFailure();
+      const token = getCachedToken();
+      if (token) {
+        if (onAuthSuccess) onAuthSuccess(user, token);
       }
     } else {
-      cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
+      setCachedAccessToken(null);
+      if (isSigningIn && onAuthFailure) {
+        onAuthFailure();
+      }
     }
   });
+};
+
+/**
+ * Convert dataURL (base64) to Blob
+ */
+export const dataUrlToBlob = (dataUrl: string): Blob => {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+};
+
+export const getDriveAuthFriendlyMessage = (error: any): string => {
+  const code = error?.code || '';
+  const message = error?.message || '';
+
+  if (code === 'auth/popup-closed-by-user' || message.includes('popup-closed-by-user')) {
+    return 'A janela do Google foi fechada antes de concluir o login.';
+  }
+  if (code === 'auth/popup-blocked' || message.includes('popup-blocked')) {
+    return 'O navegador bloqueou a janela pop-up do Google. Permita pop-ups para este site e tente novamente.';
+  }
+  if (code === 'auth/cancelled-popup-request' || message.includes('cancelled-popup-request')) {
+    return 'A solicitação de login foi cancelada.';
+  }
+  if (code === 'auth/unauthorized-domain' || message.includes('unauthorized-domain')) {
+    return 'Domínio não autorizado no Firebase Authentication. Adicione este domínio nas configurações do Firebase.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Erro de rede ao conectar com o Google. Verifique sua conexão com a internet.';
+  }
+  return message || 'Não foi possível conectar com o Google Drive.';
 };
 
 /**
@@ -95,37 +134,66 @@ export const googleSignIn = async (): Promise<{
     }
 
     cachedAccessToken = credential.accessToken;
+    setCachedAccessToken(cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    console.error('Erro ao conectar Google Drive:', error);
-    throw error;
+    // If the user closed the popup or it was cancelled, handle gracefully without alarming error
+    if (
+      error?.code === 'auth/popup-closed-by-user' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.message?.includes('popup-closed-by-user')
+    ) {
+      console.warn('Conexão Google Drive cancelada pelo usuário (janela fechada).');
+      return null;
+    }
+
+    const friendlyMessage = getDriveAuthFriendlyMessage(error);
+    console.warn('Erro ao conectar Google Drive:', friendlyMessage);
+    const customErr = new Error(friendlyMessage);
+    (customErr as any).code = error?.code;
+    throw customErr;
   } finally {
     isSigningIn = false;
   }
 };
 
 /**
- * Get current in-memory access token
+ * Get current in-memory or session access token
  */
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  return getCachedToken();
 };
 
 export const getCachedToken = (): string | null => {
-  return cachedAccessToken;
+  if (cachedAccessToken) return cachedAccessToken;
+  try {
+    const stored = sessionStorage.getItem(SESSION_TOKEN_KEY);
+    if (stored) {
+      cachedAccessToken = stored;
+      return stored;
+    }
+  } catch {}
+  return null;
 };
 
 export const hasActiveSession = (): boolean => {
-  return !!cachedAccessToken;
+  return !!getCachedToken();
 };
 
 export const requestGoogleLogin = googleSignIn;
 
 /**
- * Set in-memory access token manually (if retrieved during session)
+ * Set session access token (in-memory & sessionStorage)
  */
 export const setCachedAccessToken = (token: string | null) => {
   cachedAccessToken = token;
+  try {
+    if (token) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  } catch {}
 };
 
 /**
@@ -133,7 +201,7 @@ export const setCachedAccessToken = (token: string | null) => {
  */
 export const logoutGoogle = async () => {
   await signOut(auth);
-  cachedAccessToken = null;
+  setCachedAccessToken(null);
 };
 
 // =========================================================================

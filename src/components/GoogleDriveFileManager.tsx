@@ -20,6 +20,8 @@ import {
   LogOut,
   X,
   AlertCircle,
+  HelpCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { Company, DriveDocument, DriveCategory, DriveSettings } from '../types';
@@ -50,6 +52,8 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
   // Google Drive Auth & Settings State
   const [driveSettings, setDriveSettings] = useState<DriveSettings>({
     connected: false,
+    account_email: 'cast.servicostecnicos@gmail.com',
+    account_name: 'Cast Serviços Técnicos',
     root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
   });
   const [isConnectingDrive, setIsConnectingDrive] = useState(false);
@@ -118,6 +122,7 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
 
   // Tree View Expand / Collapse
   const [treeExpanded, setTreeExpanded] = useState(true);
+  const [renderHelpModalOpen, setRenderHelpModalOpen] = useState(false);
 
   // Load Settings & Documents
   const loadData = async () => {
@@ -156,6 +161,8 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
           account_email: user.email || undefined,
           account_name: user.displayName || undefined,
           account_photo: user.photoURL || undefined,
+          access_token: token,
+          token_expiry: Date.now() + 3500 * 1000,
         };
         setDriveSettings((prev) => ({ ...prev, ...updated }));
         api.updateDriveSettings(updated).catch(() => {});
@@ -163,16 +170,44 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
       },
       () => {
         setIsConnectingDrive(false);
-        showToast('error', 'Falha ou cancelamento na autenticação do Google Drive.');
       }
     );
   }, [currentCompanyId]);
 
   // Handle Google Login / Account Selection
-  const handleConnectGoogleDrive = () => {
-    setIsConnectingDrive(true);
-    requestGoogleLogin();
-    setTimeout(() => setIsConnectingDrive(false), 5000);
+  const handleConnectGoogleDrive = async () => {
+    try {
+      setIsConnectingDrive(true);
+      const res = await requestGoogleLogin();
+      if (!res) {
+        // User closed the popup, cancel without error
+        return;
+      }
+      if (res.accessToken && res.user) {
+        setHasTokenInMemory(true);
+        const updated = {
+          connected: true,
+          account_email: res.user.email || undefined,
+          account_name: res.user.displayName || undefined,
+          account_photo: res.user.photoURL || undefined,
+          access_token: res.accessToken,
+          token_expiry: Date.now() + 3500 * 1000,
+        };
+        setDriveSettings((prev) => ({ ...prev, ...updated }));
+        await api.updateDriveSettings(updated).catch(() => {});
+        showToast('success', `Conta Google central vinculada com sucesso: ${res.user.email}!`);
+        // Pre-create folder hierarchy for companies
+        setTimeout(() => {
+          handleSyncAllClientFolders();
+        }, 500);
+      }
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user' && !err?.message?.includes('popup-closed-by-user')) {
+        showToast('error', err.message || 'Falha ao conectar conta Google.');
+      }
+    } finally {
+      setIsConnectingDrive(false);
+    }
   };
 
   const handleDisconnectDrive = () => {
@@ -530,8 +565,8 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
                   type="button"
                   onClick={handleConnectGoogleDrive}
                   disabled={isConnectingDrive}
-                  title="Trocar conta do Google Drive"
-                  className="p-2 rounded-xl bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-xs font-semibold"
+                  title="Reconectar / Atualizar token da conta Google"
+                  className="p-2 rounded-xl bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors text-xs font-semibold cursor-pointer"
                 >
                   <RefreshCw className={`w-4 h-4 ${isConnectingDrive ? 'animate-spin' : ''}`} />
                 </button>
@@ -539,7 +574,7 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
                   type="button"
                   onClick={handleDisconnectDrive}
                   title="Desconectar Drive"
-                  className="p-2 rounded-xl bg-rose-900/30 hover:bg-rose-900/50 text-rose-300 hover:text-rose-200 transition-colors"
+                  className="p-2 rounded-xl bg-rose-900/30 hover:bg-rose-900/50 text-rose-300 hover:text-rose-200 transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -559,7 +594,7 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
                 ) : (
                   <>
                     <Folder className="w-4 h-4" />
-                    <span>Conectar Google Drive</span>
+                    <span>Conectar Conta Google Central</span>
                   </>
                 )}
               </button>
@@ -576,6 +611,17 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
               <span>Sincronizar Pastas no Drive</span>
             </button>
 
+            {/* Guide Render Button */}
+            <button
+              type="button"
+              onClick={() => setRenderHelpModalOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-indigo-500/50 bg-indigo-950/40 hover:bg-indigo-900/40 text-indigo-300 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              title="Passo a passo para autorizar a conta no Render"
+            >
+              <HelpCircle className="w-4 h-4 text-indigo-400" />
+              <span>Guia Render & Drive</span>
+            </button>
+
             {/* Open Root Folder in Drive */}
             {driveSettings.root_folder_url && (
               <a
@@ -589,6 +635,34 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
               </a>
             )}
           </div>
+        </div>
+
+        {/* Banner de Orientação da Conta Central */}
+        <div className="mt-4 p-3.5 rounded-xl bg-blue-950/30 border border-blue-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-white flex items-center gap-2">
+                <span>{driveSettings.connected ? 'Conta Central Cadastrada' : 'Central de Sincronismo do Google Drive'}</span>
+                {driveSettings.connected && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300">
+                    {driveSettings.account_email}
+                  </span>
+                )}
+              </p>
+              <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                Ao cadastrar esta conta, todas as empresas clientes do sistema salvam fotos e vídeos automaticamente nesta conta central do Google Drive, sem precisar que cada cliente crie ou conecte uma conta Google própria.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRenderHelpModalOpen(true)}
+            className="shrink-0 self-start sm:self-center px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Ver Configuração Render</span>
+          </button>
         </div>
 
         {/* Status Metrics Bar */}
@@ -1281,16 +1355,135 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setConfirmData((p) => ({ ...p, isOpen: false }))}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={confirmData.action}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors"
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition-colors cursor-pointer"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: GUIA DE CADASTRO PRÉVIO E PUBLICAÇÃO NO RENDER                     */}
+      {/* ========================================================================= */}
+      {renderHelpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Cadastro Prévio da Conta Google & Render</h3>
+                  <p className="text-xs text-slate-400">Como funciona o sincronismo das empresas com o seu Google Drive</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRenderHelpModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-300">
+              {/* Etapa 1: Como Funciona */}
+              <div className="rounded-xl border border-blue-900/50 bg-blue-950/20 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-blue-300 font-bold text-sm">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">1</span>
+                  <h4>Como Funciona o Cadastro Prévio</h4>
+                </div>
+                <p className="leading-relaxed">
+                  Você (administrador) conecta a conta Google designada (<strong>cast.servicostecnicos@gmail.com</strong>) uma única vez através do botão <strong>"Conectar Conta Google Central"</strong> acima.
+                </p>
+                <p className="leading-relaxed text-slate-400">
+                  O sistema salva a conexão e cria no seu Google Drive a pasta raiz <code>MÍDIA INDOOR - ARQUIVOS DO SISTEMA</code> com subpastas organizadas para cada empresa cadastrada (Fotos com Código Único e Documentos).
+                </p>
+              </div>
+
+              {/* Etapa 2: Como as Empresas Sincronizam */}
+              <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/20 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">2</span>
+                  <h4>Como as Empresas Clientes Salvam no Seu Drive</h4>
+                </div>
+                <p className="leading-relaxed">
+                  Quando qualquer empresa cliente entrar no painel e carregar um arquivo de mídia (foto ou vídeo), ela <strong>não precisará logar no Google</strong>.
+                </p>
+                <p className="leading-relaxed text-slate-400">
+                  O servidor utiliza automaticamente a sua conexão previamente cadastrada para salvar o arquivo na pasta da respectiva empresa no seu Drive, gerando um código único de rastreamento (ex.: <code>FOTO-CLI-ABCD</code>) e liberando o streaming direto para as TVs.
+                </p>
+              </div>
+
+              {/* Etapa 3: Configuração do Render */}
+              <div className="rounded-xl border border-indigo-900/50 bg-indigo-950/20 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs">3</span>
+                  <h4>Configuração no Render (render.com)</h4>
+                </div>
+                <p className="leading-relaxed">
+                  Após publicar o app no Render (ele receberá uma URL como <code>https://seu-app.onrender.com</code>), para autorizar a conexão da conta Google no domínio oficial:
+                </p>
+                <div className="space-y-2 bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300">
+                  <p className="font-sans font-bold text-white mb-1">A) No Google Cloud Console (console.cloud.google.com):</p>
+                  <p>1. Acesse: <strong>APIs e Serviços &gt; Credenciais &gt; IDs do cliente OAuth 2.0</strong></p>
+                  <p>2. Em <strong>Origens JavaScript autorizadas</strong>, adicione a URL do Render:</p>
+                  <code className="text-emerald-400 bg-slate-950 px-2 py-0.5 rounded block">https://seu-app.onrender.com</code>
+                  <p>3. Em <strong>URIs de redirecionamento autorizados</strong>, adicione:</p>
+                  <code className="text-emerald-400 bg-slate-950 px-2 py-0.5 rounded block">https://seu-app.onrender.com</code>
+                  <code className="text-emerald-400 bg-slate-950 px-2 py-0.5 rounded block">https://gen-lang-client-0937994667.firebaseapp.com/__/auth/handler</code>
+                </div>
+
+                <div className="space-y-2 bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300">
+                  <p className="font-sans font-bold text-white mb-1">B) No Firebase Console (console.firebase.google.com):</p>
+                  <p>1. Acesse: <strong>Autenticação &gt; Configurações &gt; Domínios autorizados</strong></p>
+                  <p>2. Adicione o domínio do Render (sem https):</p>
+                  <code className="text-emerald-400 bg-slate-950 px-2 py-0.5 rounded block">seu-app.onrender.com</code>
+                </div>
+              </div>
+
+              {/* Status Atual */}
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-bold">Status do Cadastro Atual:</span>
+                  <span className="font-bold text-white mt-0.5 block">
+                    {driveSettings.connected
+                      ? `Conectado a: ${driveSettings.account_email}`
+                      : 'Nenhuma conta Google conectada no momento'}
+                  </span>
+                </div>
+                {!driveSettings.connected && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRenderHelpModalOpen(false);
+                      handleConnectGoogleDrive();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition cursor-pointer"
+                  >
+                    Conectar Agora
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 flex justify-end bg-slate-850">
+              <button
+                type="button"
+                onClick={() => setRenderHelpModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition cursor-pointer"
+              >
+                Entendido, Fechar
               </button>
             </div>
           </div>

@@ -2327,7 +2327,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="password"
                       value={companyForm.password}
                       onChange={(e) => setCompanyForm({ ...companyForm, password: e.target.value })}
-                      placeholder={editingCompany ? 'Digite caso queira alterar a senha de acesso da empresa...' : 'Padrão: 123456 (troca no primeiro acesso)'}
+                      placeholder={editingCompany ? 'Digite caso queira alterar a senha de acesso da empresa...' : 'Padrão: 123456 (ou digite uma senha definitiva)'}
                       className="w-full min-h-[44px] rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm sm:text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
                   </div>

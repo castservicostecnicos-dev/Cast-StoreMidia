@@ -118,6 +118,14 @@ export interface Media {
   file_url: string;
   duration: number;
   active: boolean;
+  drive_file_id?: string;
+  drive_view_url?: string;
+  drive_download_url?: string;
+  drive_folder_id?: string;
+  unique_code?: string;
+  source?: 'drive' | 'device' | 'url' | 'rss' | 'weather_clock';
+  file_size?: number;
+  mime_type?: string;
   created_at: string;
   updated_at: string;
 }
@@ -262,6 +270,9 @@ export interface DriveSettings {
   root_folder_name?: string;
   root_folder_url?: string;
   last_synced_at?: string;
+  access_token?: string;
+  refresh_token?: string;
+  token_expiry?: number;
 }
 
 export interface MediaIntegrityItemResult {

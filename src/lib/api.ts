@@ -225,6 +225,8 @@ export const api = {
     }),
   uploadCompanyMedia: (data: Partial<Media>) =>
     request<Media>('/company/media', { method: 'POST', body: JSON.stringify(data) }),
+  updateCompanyMedia: (id: string, data: Partial<Media>) =>
+    request<Media>(`/company/media/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCompanyMedia: (id: string) =>
     request<{ message: string }>(`/company/media/${id}`, { method: 'DELETE' }),
 
@@ -351,6 +353,24 @@ export const api = {
   getDriveSettings: () => request<{ status: string; settings: any }>('/drive/settings'),
   updateDriveSettings: (data: any) =>
     request<{ status: string; settings: any }>('/drive/settings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  uploadCompanyMediaToDriveServer: (data: {
+    fileData: string;
+    filename: string;
+    mimeType: string;
+    name?: string;
+    duration?: number;
+    clientDriveToken?: string;
+  }) =>
+    request<{
+      status: string;
+      media: any;
+      savedToDrive: boolean;
+      driveAccount?: string;
+      message: string;
+    }>('/company/media/upload-to-drive', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

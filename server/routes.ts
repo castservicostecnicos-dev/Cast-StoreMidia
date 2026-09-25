@@ -22,34 +22,27 @@ import {
   DEFAULT_RSS_FEEDS,
   DEFAULT_PLANS,
   uploadsDir,
+  AuthSession,
 } from './db.js';
 import { realtimeHub } from './realtime.js';
 import { runMediaIntegrityAudit, MediaIntegrityAuditReport } from './mediaIntegrity.js';
 
 export const apiRouter = Router();
 
-// Sessions map
-interface Session {
-  token: string;
-  userId: string;
-  role: 'admin' | 'company' | 'operator' | 'player';
-  companyId: string | null;
-  playerId?: string;
-  createdAt: number;
-}
-
-const sessions: Map<string, Session> = new Map();
+// Persistent Sessions
+export type Session = AuthSession;
 
 function createSession(user: User, playerId?: string): string {
   const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, {
+  const session: AuthSession = {
     token,
     userId: user.id,
     role: user.role,
     companyId: user.company_id,
     playerId,
     createdAt: Date.now(),
-  });
+  };
+  db.saveSession(session);
   return token;
 }
 
@@ -66,14 +59,14 @@ function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunctio
   }
 
   const token = authHeader.substring(7);
-  const session = sessions.get(token);
+  const session = db.getSession(token);
   if (!session) {
     return res.status(401).json({ error: 'Sessão expirada ou inválida.' });
   }
 
   const user = db.getData().users.find((u) => u.id === session.userId && u.active);
   if (!user) {
-    sessions.delete(token);
+    db.removeSession(token);
     return res.status(401).json({ error: 'Usuário não encontrado ou inativo.' });
   }
 
@@ -276,6 +269,15 @@ apiRouter.post('/auth/change-password', requireAuth, (req: AuthenticatedRequest,
   db.persist();
 
   res.json({ message: 'Senha alterada com sucesso.' });
+});
+
+apiRouter.post('/auth/logout', requireAuth, (req: AuthenticatedRequest, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    db.removeSession(token);
+  }
+  res.json({ message: 'Sessão encerrada com sucesso.' });
 });
 
 apiRouter.post('/auth/forgot-password', (req, res) => {
@@ -498,6 +500,7 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     updated_at: now,
   };
 
+  const isDefaultPassword = !password || String(password).trim() === '123456';
   const initialPass = hashPassword(password || '123456');
   const newUser: User = {
     id: `usr-${Date.now()}`,
@@ -508,7 +511,7 @@ apiRouter.post('/admin/companies', requireAuth, requireRole('admin'), (req, res)
     role: 'company',
     company_id: companyId,
     active: true,
-    must_change_password: true,
+    must_change_password: isDefaultPassword,
     created_at: now,
     updated_at: now,
   };
@@ -1598,7 +1601,20 @@ apiRouter.get('/company/media', requireAuth, requireRole('company'), (req: Authe
 
 apiRouter.post('/company/media', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
   const companyId = req.user!.company_id!;
-  const { name, type, file_url, duration } = req.body;
+  const {
+    name,
+    type,
+    file_url,
+    duration,
+    drive_file_id,
+    drive_view_url,
+    drive_download_url,
+    drive_folder_id,
+    unique_code,
+    source,
+    file_size,
+    mime_type,
+  } = req.body;
 
   const mediaType = type || 'image';
   const resolvedUrl = mediaType === 'weather_clock' ? (file_url || 'widget:weather_clock') : file_url;
@@ -1633,6 +1649,14 @@ apiRouter.post('/company/media', requireAuth, requireRole('company'), (req: Auth
     file_url: resolvedUrl,
     duration: Number(duration) || 10,
     active: true,
+    drive_file_id: drive_file_id || undefined,
+    drive_view_url: drive_view_url || undefined,
+    drive_download_url: drive_download_url || undefined,
+    drive_folder_id: drive_folder_id || undefined,
+    unique_code: unique_code || undefined,
+    source: source || (drive_file_id ? 'drive' : 'device'),
+    file_size: file_size ? Number(file_size) : undefined,
+    mime_type: mime_type || undefined,
     created_at: now,
     updated_at: now,
   };
@@ -1641,6 +1665,50 @@ apiRouter.post('/company/media', requireAuth, requireRole('company'), (req: Auth
   db.persist();
 
   res.status(201).json(newMedia);
+});
+
+apiRouter.put('/company/media/:id', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
+  const companyId = req.user!.company_id!;
+  const { id } = req.params;
+  const data = db.getData();
+  const media = data.media.find((m) => m.id === id && m.company_id === companyId);
+  if (!media) {
+    return res.status(404).json({ error: 'Mídia não encontrada.' });
+  }
+
+  const {
+    name,
+    type,
+    file_url,
+    duration,
+    active,
+    drive_file_id,
+    drive_view_url,
+    drive_download_url,
+    drive_folder_id,
+    unique_code,
+    source,
+    file_size,
+    mime_type,
+  } = req.body;
+
+  if (name !== undefined) media.name = name;
+  if (type !== undefined) media.type = type;
+  if (file_url !== undefined) media.file_url = file_url;
+  if (duration !== undefined) media.duration = Number(duration) || 10;
+  if (active !== undefined) media.active = active;
+  if (drive_file_id !== undefined) media.drive_file_id = drive_file_id;
+  if (drive_view_url !== undefined) media.drive_view_url = drive_view_url;
+  if (drive_download_url !== undefined) media.drive_download_url = drive_download_url;
+  if (drive_folder_id !== undefined) media.drive_folder_id = drive_folder_id;
+  if (unique_code !== undefined) media.unique_code = unique_code;
+  if (source !== undefined) media.source = source;
+  if (file_size !== undefined) media.file_size = Number(file_size);
+  if (mime_type !== undefined) media.mime_type = mime_type;
+  media.updated_at = new Date().toISOString();
+
+  db.persist();
+  res.json(media);
 });
 
 apiRouter.delete('/company/media/:id', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
@@ -2391,8 +2459,9 @@ apiRouter.get('/player/current', (req: AuthenticatedRequest, res) => {
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    if (sessions.has(token)) {
-      session = sessions.get(token);
+    const foundSession = db.getSession(token);
+    if (foundSession) {
+      session = foundSession;
       const data = db.getData();
       user = data.users.find((u) => u.id === session!.userId);
     }
@@ -2558,8 +2627,9 @@ apiRouter.get('/player/active-call', (req, res) => {
 
   let target = playerId;
   if (!target && token) {
-    if (sessions.has(token)) {
-      target = sessions.get(token)!.playerId;
+    const foundSession = db.getSession(token);
+    if (foundSession) {
+      target = foundSession.playerId;
     } else {
       const data = db.getData();
       const pl = data.players.find(
@@ -2601,10 +2671,10 @@ apiRouter.get('/realtime/stream', (req, res) => {
 
   // If token is supplied, resolve session or match player access_token
   if (token) {
-    if (sessions.has(token)) {
-      const session = sessions.get(token)!;
-      if (session.playerId && !playerId) playerId = session.playerId;
-      if (session.companyId && !companyId) companyId = session.companyId;
+    const foundSession = db.getSession(token);
+    if (foundSession) {
+      if (foundSession.playerId && !playerId) playerId = foundSession.playerId;
+      if (foundSession.companyId && !companyId) companyId = foundSession.companyId;
     } else {
       const p = data.players.find(
         (pl) =>
@@ -2838,6 +2908,107 @@ apiRouter.get('/weather', async (req, res) => {
 // GOOGLE DRIVE & CLIENTS HIERARCHY APIS
 // ==========================================
 
+const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3/files';
+
+async function serverFindDriveFolder(token: string, folderName: string, parentId?: string): Promise<{ id: string; name: string; webViewLink?: string } | null> {
+  try {
+    let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName.replace(/'/g, "\\'")}' and trashed=false`;
+    if (parentId) query += ` and '${parentId}' in parents`;
+    const url = `${DRIVE_API_BASE}?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&pageSize=1`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    if (data.files && data.files.length > 0) return data.files[0];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function serverCreateDriveFolder(token: string, folderName: string, parentId?: string): Promise<{ id: string; name: string; webViewLink?: string }> {
+  const metadata: any = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder',
+  };
+  if (parentId) metadata.parents = [parentId];
+  const res = await fetch(`${DRIVE_API_BASE}?fields=id,name,webViewLink`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(metadata),
+  });
+  if (!res.ok) throw new Error(`Falha ao criar pasta no Drive (${res.status})`);
+  return await res.json() as any;
+}
+
+async function serverGetOrCreateFolder(token: string, folderName: string, parentId?: string) {
+  const existing = await serverFindDriveFolder(token, folderName, parentId);
+  if (existing) return existing;
+  return await serverCreateDriveFolder(token, folderName, parentId);
+}
+
+async function serverEnsureClientFolders(token: string, clientName: string, rootName = 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA') {
+  const root = await serverGetOrCreateFolder(token, rootName);
+  const clientFolder = await serverGetOrCreateFolder(token, clientName.trim(), root.id);
+  const [photosFolder, documentsFolder] = await Promise.all([
+    serverGetOrCreateFolder(token, '📸 Fotos com Código Único', clientFolder.id),
+    serverGetOrCreateFolder(token, '📄 Documentos e Arquivos', clientFolder.id),
+  ]);
+  return { root, clientFolder, photosFolder, documentsFolder };
+}
+
+async function serverUploadFileToDrive(
+  token: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string,
+  folderId: string,
+  uniqueCode: string,
+  description: string
+) {
+  const metadata = {
+    name: fileName,
+    parents: [folderId],
+    description: description || `Código Único: ${uniqueCode}`,
+  };
+
+  const formData = new FormData();
+  formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  formData.append('file', new Blob([fileBuffer], { type: mimeType || 'application/octet-stream' }), fileName);
+
+  const res = await fetch(`${DRIVE_UPLOAD_BASE}?uploadType=multipart&fields=id,name,mimeType,webViewLink,webContentLink,size`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any)?.error?.message || `Erro no upload ao Google Drive (${res.status})`);
+  }
+
+  const data = await res.json() as any;
+
+  // Make public reader
+  await fetch(`${DRIVE_API_BASE}/${data.id}/permissions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  }).catch(() => {});
+
+  const directStreamLink = `https://lh3.googleusercontent.com/d/${data.id}`;
+
+  return {
+    id: data.id,
+    name: data.name,
+    mimeType: data.mimeType,
+    webViewLink: data.webViewLink,
+    webContentLink: data.webContentLink,
+    directStreamLink,
+    size: data.size ? Number(data.size) : undefined,
+  };
+}
+
 // Drive Settings (Managed by DEV)
 apiRouter.get('/drive/settings', (req, res) => {
   const settings = db.getDriveSettings();
@@ -2853,6 +3024,9 @@ apiRouter.post('/drive/settings', (req, res) => {
     root_folder_id,
     root_folder_name,
     root_folder_url,
+    access_token,
+    refresh_token,
+    token_expiry,
   } = req.body;
 
   const updated = db.updateDriveSettings({
@@ -2863,9 +3037,199 @@ apiRouter.post('/drive/settings', (req, res) => {
     root_folder_id,
     root_folder_name,
     root_folder_url,
+    access_token,
+    refresh_token,
+    token_expiry,
   });
 
   res.json({ status: 'ok', settings: updated });
+});
+
+// Server-side upload endpoint for Company media to the pre-registered Google Drive account
+apiRouter.post('/company/media/upload-to-drive', requireAuth, requireRole('company'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const companyId = req.user!.company_id!;
+    const {
+      fileData,
+      filename,
+      mimeType,
+      name,
+      duration,
+      clientDriveToken,
+    } = req.body;
+
+    if (!fileData) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+
+    const data = db.getData();
+    const company = data.companies.find((c) => c.id === companyId);
+    if (!company) {
+      return res.status(404).json({ error: 'Empresa não encontrada.' });
+    }
+
+    // Check media limit
+    const currentMedia = data.media.filter((m) => m.company_id === companyId);
+    const plan = data.plans.find((p) => p.id === company.plan_id);
+    const maxMedia = plan?.max_media || 20;
+    if (currentMedia.length >= maxMedia) {
+      return res.status(400).json({
+        error: `Limite de mídias atingido para seu plano (${currentMedia.length}/${maxMedia}). Remova mídias obsoletas ou solicite aumento de cota.`
+      });
+    }
+
+    // Save local cache backup file first
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    let base64Data = fileData;
+    let detectedExt = 'bin';
+    if (fileData.includes(';base64,')) {
+      const parts = fileData.split(';base64,');
+      base64Data = parts[1];
+      const match = parts[0].match(/data:(.*?)$/);
+      if (match) {
+        const mime = match[1];
+        if (mime === 'image/jpeg' || mime === 'image/jpg') detectedExt = 'jpg';
+        else if (mime === 'image/png') detectedExt = 'png';
+        else if (mime === 'image/webp') detectedExt = 'webp';
+        else if (mime === 'image/gif') detectedExt = 'gif';
+        else if (mime === 'video/mp4') detectedExt = 'mp4';
+        else if (mime === 'video/webm') detectedExt = 'webm';
+        else if (mime === 'video/quicktime') detectedExt = 'mov';
+      }
+    }
+
+    const safeBaseName = (filename || 'media')
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 40);
+
+    const isVideo =
+      detectedExt === 'mp4' ||
+      detectedExt === 'webm' ||
+      detectedExt === 'mov' ||
+      (mimeType && mimeType.startsWith('video/'));
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    const uniqueLocalName = `media-${Date.now()}-${safeBaseName}.${detectedExt}`;
+    const filePath = path.join(uploadsDir, uniqueLocalName);
+    fs.writeFileSync(filePath, buffer);
+    const localUrl = `/uploads/${uniqueLocalName}`;
+
+    // Check Drive token (either pre-registered system token or client token or env var)
+    const driveSettings = db.getDriveSettings();
+    const token =
+      clientDriveToken ||
+      driveSettings.access_token ||
+      process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
+
+    const clientName = company.trade_name || company.legal_name || 'Cliente';
+    const isPhoto = !isVideo;
+    const prefix = isPhoto ? 'FOTO' : 'VID';
+    const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
+    const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
+
+    let mediaSavedToDrive = false;
+    let driveUploadInfo: any = null;
+    let targetFolderId: string | undefined = undefined;
+
+    if (token) {
+      try {
+        const structure = await serverEnsureClientFolders(
+          token,
+          clientName,
+          driveSettings.root_folder_name || 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA'
+        );
+        const targetFolder = isPhoto ? structure.photosFolder : structure.documentsFolder;
+        targetFolderId = targetFolder.id;
+        const sanitizedFileName = `${uniqueCode}_${(filename || 'arquivo').replace(/\s+/g, '_')}`;
+
+        driveUploadInfo = await serverUploadFileToDrive(
+          token,
+          buffer,
+          sanitizedFileName,
+          mimeType || (isPhoto ? 'image/jpeg' : 'video/mp4'),
+          targetFolder.id,
+          uniqueCode,
+          `Mídia indoor carregada pela empresa (${uniqueCode})`
+        );
+
+        // Catalog in Drive Documents
+        db.createDriveDocument({
+          unique_code: uniqueCode,
+          company_id: companyId,
+          sub_client_id: companyId,
+          category: isPhoto ? 'photo' : 'document',
+          title: (name || filename || 'Nova Mídia').trim(),
+          description: `Mídia para exibição em TVs (${uniqueCode})`,
+          file_name: filename || sanitizedFileName,
+          file_size: buffer.length,
+          mime_type: mimeType || (isPhoto ? 'image/jpeg' : 'video/mp4'),
+          drive_file_id: driveUploadInfo.id,
+          drive_folder_id: targetFolder.id,
+          drive_view_url: driveUploadInfo.webViewLink,
+          drive_download_url: driveUploadInfo.webContentLink,
+          local_url: localUrl,
+          status: 'completed',
+        });
+
+        // Update company drive folder URL if not set
+        if (structure.clientFolder?.webViewLink && !company.drive_folder_url) {
+          company.drive_folder_id = structure.clientFolder.id;
+          company.drive_folder_url = structure.clientFolder.webViewLink;
+          company.updated_at = new Date().toISOString();
+          db.persist();
+        }
+
+        mediaSavedToDrive = true;
+      } catch (driveErr: any) {
+        console.warn('[Google Drive Server Upload] Failed, falling back to local file:', driveErr.message);
+      }
+    }
+
+    const targetUrl = mediaSavedToDrive && driveUploadInfo
+      ? (driveUploadInfo.directStreamLink || driveUploadInfo.webViewLink)
+      : localUrl;
+
+    const now = new Date().toISOString();
+    const newMedia: Media = {
+      id: `med-${Date.now()}`,
+      company_id: companyId,
+      name: (name || filename || 'Nova Mídia').trim(),
+      type: isVideo ? 'video' : 'image',
+      file_url: targetUrl,
+      duration: Number(duration) || 10,
+      active: true,
+      drive_file_id: driveUploadInfo?.id,
+      drive_view_url: driveUploadInfo?.webViewLink,
+      drive_download_url: driveUploadInfo?.webContentLink,
+      drive_folder_id: targetFolderId,
+      unique_code: uniqueCode,
+      source: mediaSavedToDrive ? 'drive' : 'device',
+      file_size: buffer.length,
+      mime_type: mimeType || (isPhoto ? 'image/jpeg' : 'video/mp4'),
+      created_at: now,
+      updated_at: now,
+    };
+
+    data.media.push(newMedia);
+    db.persist();
+
+    res.json({
+      status: 'ok',
+      media: newMedia,
+      savedToDrive: mediaSavedToDrive,
+      driveAccount: driveSettings.account_email,
+      message: mediaSavedToDrive
+        ? `Mídia salva com sucesso no Google Drive na pasta "${clientName}" com código ${uniqueCode}!`
+        : 'Mídia salva no servidor local (Conecte a conta Google no painel para salvar no Drive).',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao processar upload de mídia.' });
+  }
 });
 
 // Sub-Clients (Clientes do Cliente A)

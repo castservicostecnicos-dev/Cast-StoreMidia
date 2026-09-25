@@ -43,6 +43,47 @@ Se preferir criar o serviço manualmente no Render:
     - `FIRESTORE_DATABASE_ID`: `ai-studio-mdiaindoor-0ee6f26d-4225-42ad-910a-5d51615f2900`
 ---
 
+### Configuração do Google Drive no Render (Passo a Passo Completo):
+
+Para que os arquivos de mídia carregados por **qualquer empresa cliente** sejam salvos automaticamente no Google Drive da sua conta previamente cadastrada no seu app publicado em `https://cast-storemidia-1.onrender.com`:
+
+#### 1. Autorizar o Domínio do Render no Google Cloud Console
+1. Acesse o [Google Cloud Console](https://console.cloud.google.com/) com a sua conta (`ale11062@gmail.com`) e selecione o projeto: **`gen-lang-client-0937994667`**.
+2. No menu lateral à esquerda, vá em **APIs e Serviços** > **Credenciais**.
+3. Na seção **IDs do cliente OAuth 2.0**, clique no cliente Web do aplicativo.
+4. Na seção **Origens JavaScript autorizadas**, clique em **Adicionar URI** e insira exatamente:
+   - `https://cast-storemidia-1.onrender.com`
+5. Na seção **URIs de redirecionamento autorizados**, clique em **Adicionar URI** e insira exatamente:
+   - `https://cast-storemidia-1.onrender.com`
+   - `https://gen-lang-client-0937994667.firebaseapp.com/__/auth/handler`
+6. Clique em **Salvar** no rodapé da página.
+
+#### 2. Autorizar o Domínio do Render no Firebase Authentication
+1. Acesse o [Console do Firebase](https://console.firebase.google.com/) e selecione o projeto: **`gen-lang-client-0937994667`**.
+2. No menu lateral, clique em **Criação** (ou Build) > **Authentication (Autenticação)**.
+3. Clique na aba superior **Settings (Configurações)** > submenu **Authorized domains (Domínios autorizados)**.
+4. Clique em **Add domain (Adicionar domínio)** e digite exatamente:
+   - `cast-storemidia-1.onrender.com`
+5. Clique em **Adicionar**.
+
+#### 3. Realizar o Cadastro Prévio da Conta Google no App Publicado
+1. Abra o link do seu app no navegador: [https://cast-storemidia-1.onrender.com/](https://cast-storemidia-1.onrender.com/)
+2. Faça login como **Administrador** (ou com suas credenciais de DEV).
+3. Vá até a aba **Google Drive / Central de Arquivos**.
+4. Clique no botão azul **"Conectar Conta Google Central"**.
+5. Uma janela pop-up do Google abrirá já sugerindo a conta: selecione a conta Google **`cast.servicostecnicos@gmail.com`** e confirme a permissão para gerenciar os arquivos no Google Drive.
+6. Pronto! O sistema exibirá o selo verde:
+   `✓ Conta Central Cadastrada: cast.servicostecnicos@gmail.com`.
+7. Clique em **"Sincronizar Pastas no Drive"** para criar instantaneamente no Google Drive da conta `cast.servicostecnicos@gmail.com` a pasta:
+   - `📁 MÍDIA INDOOR - ARQUIVOS DO SISTEMA`
+   - E dentro dela, as pastas organizadas para cada cliente cadastrado.
+
+#### 4. Como as Empresas Clientes Realizam o Sincronismo
+- Uma vez concluído o passo 3 acima, **nenhuma empresa cliente precisará de conta Google nem de login adicional**.
+- Quando a empresa acessar o painel dela no Render e fizer upload de uma foto ou vídeo, o backend do app salva o arquivo automaticamente na respectiva pasta do seu Google Drive com um código único (ex.: `FOTO-CLI-ABCD`) e gera a URL pública de streaming de alta resolução direto para as TVs.
+
+---
+
 ### Web Service vs. Static Site no Render (Dúvida Frequente):
 - **O app pode rodar como um "Static Site" puro (sem backend)?**
   - **NÃO como um serviço isolado**. Um "Static Site" serve apenas arquivos HTML/JS/CSS estáticos e **não executa Node.js**.
