@@ -20,13 +20,6 @@ async function startServer() {
     })
   );
 
-  // Initialize and restore database from Firebase Firestore
-  try {
-    await db.initFromFirestore();
-  } catch (err) {
-    console.error('[Startup] Failed to restore from Firestore:', err);
-  }
-
   // Serve persistent uploads folder
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -46,6 +39,11 @@ async function startServer() {
   // Mount API router
   app.use('/api', apiRouter);
 
+  // Prevent unhandled /api/* routes from falling through to Vite SPA index.html
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({ error: `Endpoint de API não encontrado: ${req.method} ${req.originalUrl}` });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -63,6 +61,10 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Indoor Media Server running on port ${PORT}`);
+    // Initialize and restore database from Firebase Firestore in background after port is bound
+    db.initFromFirestore().catch((err) => {
+      console.error('[Startup] Failed to restore from Firestore:', err);
+    });
   });
 }
 

@@ -83,14 +83,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right side controls */}
         <div className="flex items-center gap-3 sm:gap-6">
-          {/* Status badge from Sleek Interface */}
-          <div className="hidden md:flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="text-xs text-slate-400 uppercase tracking-widest font-medium">Sistema Operacional</span>
-          </div>
-
-          <div className="hidden md:block h-8 w-[1px] bg-slate-700"></div>
-
           <PWAInstallButton />
 
           {/* Quick Demo Role Switcher (Exclusivo Admin Geral) */}

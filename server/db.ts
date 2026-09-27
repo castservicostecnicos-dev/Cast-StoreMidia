@@ -67,6 +67,7 @@ export interface Player {
   user_id: string;
   name: string;
   code: string;
+  short_code?: string;
   location: string;
   description: string;
   orientation: 'horizontal' | 'vertical'; // 'horizontal' (16:9 - 1920x1080) | 'vertical' (9:16 - 1080x1920)
@@ -607,11 +608,31 @@ class DatabaseStore {
           changed = true;
         }
 
-        // Ensure all players have a unique persistent access_token for direct URL auto-start
+        // Ensure all players have a unique persistent access_token and short_code (mip000..mip999) for direct URL auto-start
         if (this.data.players && Array.isArray(this.data.players)) {
+          const usedShortCodes = new Set<string>();
+          for (const pl of this.data.players) {
+            if (pl.short_code) {
+              usedShortCodes.add(pl.short_code.toLowerCase());
+            } else if (/^mip\d{3}$/i.test(pl.code)) {
+              pl.short_code = pl.code.toLowerCase();
+              usedShortCodes.add(pl.short_code);
+              changed = true;
+            }
+          }
+          let nextNum = 0;
           for (const pl of this.data.players) {
             if (!pl.access_token) {
               pl.access_token = `tok_${crypto.randomBytes(16).toString('hex')}`;
+              changed = true;
+            }
+            if (!pl.short_code) {
+              while (usedShortCodes.has(`mip${String(nextNum).padStart(3, '0')}`)) {
+                nextNum++;
+              }
+              pl.short_code = `mip${String(nextNum).padStart(3, '0')}`;
+              usedShortCodes.add(pl.short_code);
+              nextNum++;
               changed = true;
             }
           }
@@ -979,6 +1000,7 @@ class DatabaseStore {
         user_id: playerUser1.id,
         name: 'PLAYER RECEPÇÃO',
         code: 'PLAY-REC-01',
+        short_code: 'mip000',
         location: 'Hall de Entrada Principal',
         description: 'Smart TV 55 polegadas na recepção principal.',
         orientation: 'horizontal',
@@ -995,6 +1017,7 @@ class DatabaseStore {
         user_id: playerUser2.id,
         name: 'PLAYER SALA 02 (TOTEM)',
         code: 'PLAY-SALA-02',
+        short_code: 'mip001',
         location: 'Sala de Espera 02',
         description: 'Totem digital vertical 9:16 na sala de espera.',
         orientation: 'vertical',
@@ -1509,6 +1532,7 @@ class DatabaseStore {
         user_id: play1User.id,
         name: 'PLAYER RECEPÇÃO',
         code: 'PLAY-REC-01',
+        short_code: 'mip000',
         location: 'Hall de Entrada Principal',
         description: 'Smart TV 55 polegadas na recepção principal.',
         orientation: 'horizontal',
@@ -1525,6 +1549,7 @@ class DatabaseStore {
         user_id: play2User.id,
         name: 'PLAYER SALA 02 (TOTEM)',
         code: 'PLAY-SALA-02',
+        short_code: 'mip001',
         location: 'Sala de Espera 02',
         description: 'Totem digital vertical 9:16 na sala de espera.',
         orientation: 'vertical',
@@ -1714,6 +1739,7 @@ class DatabaseStore {
         user_id: play3User.id,
         name: 'TV VENDAS / HORTIFRUTI',
         code: 'PLAY-MERC-02',
+        short_code: 'mip002',
         location: 'Salão Central de Vendas',
         description: 'Smart TV 65 polegadas voltada para o corredor principal e caixas.',
         orientation: 'horizontal',

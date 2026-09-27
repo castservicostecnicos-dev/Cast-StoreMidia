@@ -240,10 +240,10 @@ export const PlayerDiagnosticView: React.FC<PlayerDiagnosticViewProps> = ({
               <div className="flex items-center gap-2">
                 <h4 className="text-sm font-black uppercase tracking-wider">
                   {isHealthy
-                    ? 'Player Conectado & Operante'
+                    ? 'Player Online'
                     : isWaiting
-                    ? 'Aguardando Próximo Ciclo (Sinal em Trânsito)'
-                    : 'Player Offline — Sinal Interrompido'}
+                    ? 'Aguardando Sinal'
+                    : 'Player Offline'}
                 </h4>
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -262,15 +262,6 @@ export const PlayerDiagnosticView: React.FC<PlayerDiagnosticViewProps> = ({
                   {isHealthy ? 'Online' : isWaiting ? 'Alerta' : 'Offline'}
                 </span>
               </div>
-              <p className="text-xs mt-1 text-slate-300">
-                {isHealthy
-                  ? `Batimentos cardíacos (heartbeats) sendo recebidos dentro da frequência programada de ${expectedInterval}s.`
-                  : isWaiting
-                  ? `O último sinal foi há ${elapsedSec}s. O envio ocorre a cada ${expectedInterval}s e está dentro da tolerância de até ${timeoutThreshold}s.`
-                  : !hasEverConnected
-                  ? 'O reprodutor nunca enviou nenhum sinal desde a sua criação.'
-                  : `Nenhum sinal recebido há ${elapsedText}. O limite de tolerância (${timeoutThreshold}s) foi ultrapassado por ${timeoutDiffSec}s.`}
-              </p>
             </div>
           </div>
 
@@ -449,72 +440,8 @@ export const PlayerDiagnosticView: React.FC<PlayerDiagnosticViewProps> = ({
         </div>
       </div>
 
-      {/* Diagnostic Analysis: Why the player might appear offline */}
-      <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4 mb-6">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3 flex items-center gap-2">
-          <HelpCircle className="h-4 w-4 text-blue-400" />
-          <span>Diagnóstico de Causas: Por que este player está {isOffline ? 'offline' : 'online'}?</span>
-        </h4>
-
-        {isOffline ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/80">
-              <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                1. Queda de Conexão ou Wi-Fi
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                O dispositivo no local ({player.location || 'área de atendimento'}) pode ter perdido sinal de Wi-Fi, o cabo de rede Ethernet foi desconectado ou o roteador local está sem internet.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/80">
-              <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                2. TV ou Reprodutor Desligado
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                A TV, Mini PC, TV Box ou Raspberry Pi pode estar sem energia elétrica, em modo de descanso/standby ou na entrada HDMI incorreta.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/80">
-              <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                3. Aplicativo / Tela Fechada
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                O navegador web ou aplicativo do reprodutor não está rodando com o código <strong>{player.code}</strong> ou a aba foi acidentalmente fechada.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/80">
-              <div className="flex items-center gap-2 text-rose-300 text-xs font-bold mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                4. Bloqueio de Firewall / Proxy
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Redes corporativas com restrição de portas podem estar bloqueando o endpoint de heartbeat (<code>/api/player/heartbeat</code>).
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="p-3.5 rounded-lg border border-emerald-900/40 bg-emerald-950/20 text-emerald-300 text-xs flex items-center gap-2.5">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-            <span>
-              <strong>Comunicação Estável:</strong> O player está respondendo dentro dos prazos operacionais. Os dados da playlist, clima e chamadas prioritárias são transmitidos em tempo real via Server-Sent Events (SSE).
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Troubleshooting Action Guide */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 pt-4">
-        <div className="text-xs text-slate-400">
-          Precisa restabelecer o sinal do player na tela física?
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-700 pt-4">
           {/* Open player in new tab */}
           <a
             href={`/?player=${encodeURIComponent(player.code)}`}
@@ -551,7 +478,6 @@ export const PlayerDiagnosticView: React.FC<PlayerDiagnosticViewProps> = ({
               <span>Simular Nesta Aba</span>
             </button>
           )}
-        </div>
       </div>
     </div>
   );

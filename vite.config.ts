@@ -58,12 +58,14 @@ export default defineConfig(() => {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
+          navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
           runtimeCaching: [
             // 1. Video Assets (MP4, WebM, OGG) with Range Requests for seekable offline playback
             {
               urlPattern: ({ request, url }) =>
-                request.destination === 'video' ||
-                /\.(?:mp4|webm|ogg|m4v|mov)$/i.test(url.pathname),
+                !url.pathname.startsWith('/api/') &&
+                (request.destination === 'video' ||
+                  /\.(?:mp4|webm|ogg|m4v|mov)$/i.test(url.pathname)),
               handler: 'CacheFirst',
               options: {
                 cacheName: 'indoor-media-videos-v1',
@@ -81,10 +83,11 @@ export default defineConfig(() => {
             // 2. Image Assets (PNG, JPG, JPEG, SVG, WebP, GIF, AVIF)
             {
               urlPattern: ({ request, url }) =>
-                request.destination === 'image' ||
-                /\.(?:png|jpg|jpeg|svg|gif|webp|avif|ico)$/i.test(url.pathname) ||
-                url.pathname.startsWith('/uploads/') ||
-                url.pathname.includes('/media/'),
+                (!url.pathname.startsWith('/api/') || url.pathname.startsWith('/api/uploads/')) &&
+                (request.destination === 'image' ||
+                  /\.(?:png|jpg|jpeg|svg|gif|webp|avif|ico)$/i.test(url.pathname) ||
+                  url.pathname.startsWith('/uploads/') ||
+                  url.pathname.startsWith('/api/uploads/')),
               handler: 'CacheFirst',
               options: {
                 cacheName: 'indoor-media-images-v1',
@@ -101,8 +104,9 @@ export default defineConfig(() => {
             // 3. Audio Chimes & Alert Sounds
             {
               urlPattern: ({ request, url }) =>
-                request.destination === 'audio' ||
-                /\.(?:mp3|wav|ogg|aac)$/i.test(url.pathname),
+                !url.pathname.startsWith('/api/') &&
+                (request.destination === 'audio' ||
+                  /\.(?:mp3|wav|ogg|aac)$/i.test(url.pathname)),
               handler: 'CacheFirst',
               options: {
                 cacheName: 'indoor-media-audio-v1',

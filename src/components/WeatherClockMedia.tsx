@@ -209,8 +209,8 @@ export const WeatherClockMedia: React.FC<WeatherClockMediaProps> = ({
                   {weatherData.text}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium">
-                Condições climáticas agora em <strong className="text-slate-200">{displayCity}</strong>
+              <p className="text-xs sm:text-sm text-slate-300 font-semibold">
+                {displayCity}
               </p>
             </div>
           </div>

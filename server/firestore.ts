@@ -123,7 +123,12 @@ export async function loadDatabaseFromFirestore(): Promise<FirestoreLoadResult> 
 
   try {
     const targetDoc = doc(db, 'app_data', 'indoor_media_db');
-    const snap = await getDoc(targetDoc);
+    const snap = await Promise.race([
+      getDoc(targetDoc),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Firestore read timeout after 5s')), 5000)
+      ),
+    ]);
 
     if (!snap.exists()) {
       console.log('[Firebase Firestore] Document app_data/indoor_media_db does not exist yet (first initialization).');

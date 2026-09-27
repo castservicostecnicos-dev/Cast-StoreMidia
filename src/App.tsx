@@ -293,15 +293,6 @@ export default function App() {
         )}
       </main>
 
-      {/* FOOTER */}
-      <footer className="h-9 bg-slate-800 border-t border-slate-700 px-4 sm:px-8 flex items-center justify-between text-[10px] text-slate-400 uppercase tracking-widest">
-        <div>© {new Date().getFullYear()} Media Projector Indoor System - v2.4.0</div>
-        <div className="flex gap-4 items-center">
-          <span className="hidden sm:inline">Transmissão: SSE Realtime</span>
-          <span>Status: <span className="text-green-500 font-bold">Operacional</span></span>
-        </div>
-      </footer>
-
       {/* MODAL ALTERAR SENHA */}
       {changePasswordOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs">

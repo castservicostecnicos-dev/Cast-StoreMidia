@@ -54,11 +54,16 @@ export interface AuthenticatedRequest extends Request {
 
 function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const queryToken = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+  const token =
+    authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.substring(7)
+      : queryToken;
+
+  if (!token) {
     return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
   }
 
-  const token = authHeader.substring(7);
   const session = db.getSession(token);
   if (!session) {
     return res.status(401).json({ error: 'Sessão expirada ou inválida.' });
@@ -175,11 +180,17 @@ apiRouter.post('/auth/login', (req, res) => {
   }
 
   const normalizedEmail = String(email).trim().toLowerCase();
-  const user = data.users.find(
+  let user = data.users.find(
     (u) =>
       u.email.toLowerCase() === normalizedEmail ||
       (u.role === 'admin' && (normalizedEmail === 'admin' || normalizedEmail === 'admin@admin.com' || normalizedEmail === 'admin@midia.com'))
   );
+  if (!user) {
+    const matchedComp = data.companies.find((c) => c.email && c.email.trim().toLowerCase() === normalizedEmail);
+    if (matchedComp) {
+      user = data.users.find((u) => u.company_id === matchedComp.id && u.role === 'company');
+    }
+  }
   if (!user || !user.active) {
     return res.status(401).json({ error: 'Credenciais inválidas ou usuário inativo.' });
   }
@@ -848,6 +859,9 @@ apiRouter.delete('/admin/plans/:id', requireAuth, requireRole('admin'), (req, re
 apiRouter.get('/company/stats', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
   const companyId = req.user!.company_id!;
   const data = db.getData();
+  if (ensureCompanyDefaultMedia(companyId, data)) {
+    db.persist();
+  }
   const now = Date.now();
 
   const company = data.companies.find((c) => c.id === companyId);
@@ -2370,7 +2384,8 @@ apiRouter.post('/operator/call', requireAuth, (req: AuthenticatedRequest, res) =
     return res.status(403).json({ error: 'Permissão negada. Apenas operador, empresa ou administrador podem realizar chamadas.' });
   }
 
-  const { playerId, phrase, phraseId, duration, isPriority, is_priority } = req.body;
+  const { phrase, phraseId, duration, isPriority, is_priority } = req.body;
+  const playerId = req.body.playerId || req.body.player_id;
 
   if (!playerId || !phrase) {
     return res.status(400).json({ error: 'Selecione o player e a frase da chamada.' });
@@ -2905,6 +2920,144 @@ apiRouter.get('/weather', async (req, res) => {
 });
 
 // ==========================================
+// PORTUGUESE TTS (TEXT-TO-SPEECH) AUDIO API
+// ==========================================
+
+const ttsAudioCache = new Map<string, { buffer: Buffer; timestamp: number }>();
+const TTS_CACHE_MAX_SIZE = 150;
+const TTS_CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+
+function splitTextForTts(text: string, maxLen = 180): string[] {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+  if (cleaned.length <= maxLen) return [cleaned];
+
+  const parts: string[] = [];
+  const sentences = cleaned.split(/(?<=[.!?;,])\s+/);
+  let current = '';
+
+  for (const sentence of sentences) {
+    if ((current + ' ' + sentence).trim().length <= maxLen) {
+      current = (current + ' ' + sentence).trim();
+    } else {
+      if (current) parts.push(current);
+      if (sentence.length <= maxLen) {
+        current = sentence;
+      } else {
+        // Hard split long sentence by words
+        const words = sentence.split(' ');
+        current = '';
+        for (const w of words) {
+          if ((current + ' ' + w).trim().length <= maxLen) {
+            current = (current + ' ' + w).trim();
+          } else {
+            if (current) parts.push(current);
+            current = w.slice(0, maxLen);
+          }
+        }
+      }
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+async function fetchTtsChunkBuffer(chunk: string, lang: string): Promise<Buffer> {
+  const upstreams = [
+    `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(lang)}&client=tw-ob&q=${encodeURIComponent(chunk)}`,
+    `https://translate.googleapis.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(lang)}&client=gtx&q=${encodeURIComponent(chunk)}`,
+  ];
+
+  let lastErr: any = null;
+  for (const ttsUrl of upstreams) {
+    try {
+      const response = await fetch(ttsUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Referer: 'https://translate.google.com/',
+          Accept: 'audio/mpeg, audio/*;q=0.9, */*;q=0.8',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS upstream returned status ${response.status}`);
+      }
+
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (contentType.includes('text/html') || contentType.includes('application/json')) {
+        throw new Error(`TTS upstream returned unexpected content-type: ${contentType}`);
+      }
+
+      const arrayBuf = await response.arrayBuffer();
+      const buf = Buffer.from(arrayBuf);
+
+      // Ensure buffer is non-empty and does not start with HTML '<' (0x3c) or JSON '{' (0x7b)
+      if (buf.length > 100 && buf[0] !== 0x3c && buf[0] !== 0x7b) {
+        return buf;
+      }
+      throw new Error('Invalid or empty audio buffer from upstream');
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  throw lastErr || new Error('All TTS upstreams failed');
+}
+
+apiRouter.get('/tts', async (req, res) => {
+  try {
+    const rawText = String(req.query.text || '').trim();
+    const lang = String(req.query.lang || 'pt-BR').trim() || 'pt-BR';
+
+    if (!rawText) {
+      return res.status(400).json({ error: 'Parâmetro text é obrigatório.' });
+    }
+
+    const normalizedText = rawText.slice(0, 600);
+    const cacheKey = `${lang}:${normalizedText.toLowerCase()}`;
+    const cached = ttsAudioCache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < TTS_CACHE_TTL_MS && cached.buffer.length > 100 && cached.buffer[0] !== 0x3c) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', String(cached.buffer.length));
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(cached.buffer);
+    }
+
+    const chunks = splitTextForTts(normalizedText, 180);
+    const buffers: Buffer[] = [];
+
+    for (const chunk of chunks) {
+      const buf = await fetchTtsChunkBuffer(chunk, lang);
+      buffers.push(buf);
+    }
+
+    const combinedBuffer = Buffer.concat(buffers);
+    if (combinedBuffer.length === 0) {
+      throw new Error('Empty audio buffer received from TTS upstream');
+    }
+
+    // Prune oldest cache entries if full
+    if (ttsAudioCache.size >= TTS_CACHE_MAX_SIZE) {
+      const oldestKey = ttsAudioCache.keys().next().value;
+      if (oldestKey) ttsAudioCache.delete(oldestKey);
+    }
+    ttsAudioCache.set(cacheKey, { buffer: combinedBuffer, timestamp: Date.now() });
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', String(combinedBuffer.length));
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(combinedBuffer);
+  } catch (err: any) {
+    console.warn('[TTS API] Fallback trigger:', err?.message || err);
+    return res.status(502).json({ error: 'Falha ao sintetizar áudio no servidor.' });
+  }
+});
+
+// ==========================================
 // GOOGLE DRIVE & CLIENTS HIERARCHY APIS
 // ==========================================
 
@@ -3071,7 +3224,10 @@ apiRouter.post('/company/media/upload-to-drive', requireAuth, requireRole('compa
     // Check media limit
     const currentMedia = data.media.filter((m) => m.company_id === companyId);
     const plan = data.plans.find((p) => p.id === company.plan_id);
-    const maxMedia = plan?.max_media || 20;
+    const maxMedia =
+      company.max_media !== undefined && company.max_media !== null
+        ? Number(company.max_media)
+        : (plan?.max_media || plan?.max_storage || 20);
     if (currentMedia.length >= maxMedia) {
       return res.status(400).json({
         error: `Limite de mídias atingido para seu plano (${currentMedia.length}/${maxMedia}). Remova mídias obsoletas ou solicite aumento de cota.`
@@ -3339,7 +3495,8 @@ apiRouter.post('/drive/documents', (req, res) => {
     status,
   } = req.body;
 
-  if (!company_id || !sub_client_id || !title || !category) {
+  const effectiveSubClientId = sub_client_id || company_id;
+  if (!company_id || !effectiveSubClientId || !title || !category) {
     return res.status(400).json({ error: 'Dados incompletos para registrar o documento/foto' });
   }
 
@@ -3356,7 +3513,7 @@ apiRouter.post('/drive/documents', (req, res) => {
   const newDoc = db.createDriveDocument({
     unique_code: code,
     company_id,
-    sub_client_id,
+    sub_client_id: effectiveSubClientId,
     category,
     title: title.trim(),
     description: description ? description.trim() : '',
@@ -3381,6 +3538,7 @@ apiRouter.put('/drive/documents/:id', (req, res) => {
     description,
     category,
     status,
+    company_id,
     sub_client_id,
     drive_view_url,
     drive_download_url,
@@ -3393,6 +3551,7 @@ apiRouter.put('/drive/documents/:id', (req, res) => {
     description,
     category,
     status,
+    company_id,
     sub_client_id,
     drive_view_url,
     drive_download_url,

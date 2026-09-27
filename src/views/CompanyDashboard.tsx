@@ -46,21 +46,11 @@ import {
   Eye,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, DriveDocument, DriveSettings, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
+import { CompanyStats, Player, Operator, Playlist, Media, RssFeed, Company, MediaIntegrityAuditReport, MediaIntegrityItemResult } from '../types';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { GoogleDriveFileManager } from '../components/GoogleDriveFileManager';
 import { MediaThumbnail } from '../components/MediaThumbnail';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
-import {
-  ensureClientFolders,
-  uploadFileToDrive,
-  getCachedToken,
-  requestGoogleLogin,
-  makeDriveFilePublic,
-  resolveMediaDisplayUrl,
-  dataUrlToBlob,
-  hasActiveSession,
-} from '../lib/googleDrive';
+import { resolveMediaDisplayUrl } from '../lib/googleDrive';
 
 interface CompanyDashboardProps {
   showToast: (type: 'success' | 'error' | 'info', message: string) => void;
@@ -73,7 +63,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   onOpenPlayerSimulation,
   companyInfo,
 }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'players' | 'operators' | 'playlists' | 'media' | 'rss' | 'files'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'players' | 'operators' | 'playlists' | 'media' | 'rss'>('dashboard');
   const [stats, setStats] = useState<CompanyStats | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -212,41 +202,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   });
 
   const [mediaSourceType, setMediaSourceType] = useState<
-    'device' | 'url' | 'rss' | 'weather_clock' | 'drive'
+    'device' | 'url' | 'rss' | 'weather_clock'
   >('device');
-  const [driveMediaTab, setDriveMediaTab] = useState<'select' | 'upload'>('select');
-  const [companyDriveDocs, setCompanyDriveDocs] = useState<DriveDocument[]>([]);
-  const [selectedDriveDocId, setSelectedDriveDocId] = useState<string>('');
-  const [driveUploadFile, setDriveUploadFile] = useState<File | null>(null);
-  const [driveUploadPreview, setDriveUploadPreview] = useState<string | null>(null);
-  const [isLoadingDriveDocs, setIsLoadingDriveDocs] = useState(false);
-  const driveFileInputRef = useRef<HTMLInputElement>(null);
-
-  const loadCompanyDriveDocs = async () => {
-    try {
-      setIsLoadingDriveDocs(true);
-      const res = await api.getDriveDocuments({
-        companyId: companyInfo?.id,
-      });
-      if (res.documents) {
-        setCompanyDriveDocs(res.documents);
-      }
-    } catch (e) {
-      console.warn('Could not load company drive docs:', e);
-    } finally {
-      setIsLoadingDriveDocs(false);
-    }
-  };
-
-  const [driveSettings, setDriveSettings] = useState<DriveSettings>({
-    connected: false,
-    account_email: 'cast.servicostecnicos@gmail.com',
-    account_name: 'Cast Serviços Técnicos',
-    root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
-  });
-  const [hasDriveToken, setHasDriveToken] = useState(false);
-  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
-  const [saveToGoogleDrive, setSaveToGoogleDrive] = useState(true);
 
   const [selectedDeviceFile, setSelectedDeviceFile] = useState<{
     file: File | null;
@@ -277,16 +234,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     });
     setMediaSourceType('device');
     setSelectedDeviceFile(null);
-    setSelectedDriveDocId('');
-    setDriveUploadFile(null);
-    setDriveUploadPreview(null);
     setIsUploadingMedia(false);
     setIsDraggingFile(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
-    }
-    if (driveFileInputRef.current) {
-      driveFileInputRef.current.value = '';
     }
   };
 
@@ -298,25 +249,20 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   const loadData = async () => {
     try {
       setLoading(true);
-      const [s, pl, op, py, md, rs, dr] = await Promise.all([
+      const [s, pl, op, py, md, rs] = await Promise.all([
         api.getCompanyStats(),
         api.getCompanyPlayers(),
         api.getCompanyOperators(),
         api.getCompanyPlaylists(),
         api.getCompanyMedia(),
         api.getCompanyRss(),
-        api.getDriveSettings().catch(() => ({ status: 'ok', settings: driveSettings })),
       ]);
       setStats(s);
-      setPlayers(pl);
-      setOperators(op);
-      setPlaylists(py);
-      setMediaList(md);
-      setRssList(rs);
-      if (dr && dr.settings) {
-        setDriveSettings(dr.settings);
-      }
-      setHasDriveToken(hasActiveSession());
+      setPlayers(Array.isArray(pl) ? pl : []);
+      setOperators(Array.isArray(op) ? op : []);
+      setPlaylists(Array.isArray(py) ? py : []);
+      setMediaList(Array.isArray(md) ? md : []);
+      setRssList(Array.isArray(rs) ? rs : []);
 
       // Load cached integrity status if any
       api.getMediaIntegrityStatus().then((rep) => {
@@ -329,152 +275,21 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     }
   };
 
-  const handleConnectGoogleDrive = async () => {
-    try {
-      setIsConnectingDrive(true);
-      const authResult = await requestGoogleLogin();
-      if (!authResult) {
-        // User closed or dismissed the popup
-        return;
-      }
-      if (authResult?.user && authResult.accessToken) {
-        setHasDriveToken(true);
-        const updated: Partial<DriveSettings> = {
-          connected: true,
-          account_email: authResult.user.email || undefined,
-          account_name: authResult.user.displayName || undefined,
-          account_photo: authResult.user.photoURL || undefined,
-        };
-        setDriveSettings((prev) => ({ ...prev, ...updated }));
-        await api.updateDriveSettings(updated).catch(() => {});
-        showToast('success', `Google Drive conectado com sucesso: ${authResult.user.email}`);
-
-        // Automatically create or verify company folder hierarchy
-        const clientName = companyInfo?.name || 'Cliente';
-        const structure = await ensureClientFolders(authResult.accessToken, clientName);
-        if (structure?.clientFolder?.webViewLink) {
-          await api.updateCompanyDriveFolder({
-            drive_folder_id: structure.clientFolder.id,
-            drive_folder_url: structure.clientFolder.webViewLink,
-          }).catch(() => {});
-          if (stats) {
-            setStats((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    drive_folder_id: structure.clientFolder.id,
-                    drive_folder_url: structure.clientFolder.webViewLink,
-                  }
-                : prev
-            );
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user' && !err?.message?.includes('popup-closed-by-user')) {
-        console.error('Erro ao conectar Google Drive:', err);
-        showToast('error', err.message || 'Falha ao conectar conta Google.');
-      }
-    } finally {
-      setIsConnectingDrive(false);
-    }
-  };
-
-  const handleSyncMediaToDrive = async (media: Media) => {
-    let token = getCachedToken();
-    if (!token) {
-      showToast('info', 'Conecte sua conta do Google Drive para autorizar o envio.');
-      try {
-        const authResult = await requestGoogleLogin();
-        if (!authResult?.accessToken) return;
-        token = authResult.accessToken;
-        setHasDriveToken(true);
-      } catch {
-        return;
-      }
-    }
-
-    try {
-      showToast('info', `Enviando "${media.name}" para a pasta do Google Drive...`);
-      const fileUrl = resolveMediaDisplayUrl(media.file_url);
-      const resp = await fetch(fileUrl);
-      if (!resp.ok) throw new Error('Não foi possível obter a mídia original para enviar ao Drive.');
-      const blob = await resp.blob();
-
-      const clientName = companyInfo?.name || 'Cliente';
-      const structure = await ensureClientFolders(token, clientName);
-      const isPhoto = media.type !== 'video';
-      const targetFolder = isPhoto
-        ? structure.categoryFolders.photos
-        : structure.categoryFolders.documents;
-      const prefix = isPhoto ? 'FOTO' : 'VID';
-      const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
-      const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
-      const ext = media.type === 'video' ? 'mp4' : 'jpg';
-      const sanitizedFileName = `${uniqueCode}_${media.name.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
-
-      const driveRes = await uploadFileToDrive(
-        token,
-        blob,
-        sanitizedFileName,
-        targetFolder.id,
-        {
-          description: `Mídia sincronizada para o Google Drive (${uniqueCode})`,
-          uniqueCode,
-        }
-      );
-
-      await api.updateCompanyMedia(media.id, {
-        file_url: driveRes.directStreamLink || driveRes.webViewLink,
-        drive_file_id: driveRes.id,
-        drive_view_url: driveRes.webViewLink,
-        drive_download_url: driveRes.webContentLink,
-        drive_folder_id: targetFolder.id,
-        unique_code: uniqueCode,
-        source: 'drive',
-      });
-
-      await api.createDriveDocument({
-        unique_code: uniqueCode,
-        company_id: companyInfo?.id || '',
-        category: isPhoto ? 'photo' : 'document',
-        title: media.name,
-        description: `Mídia de exibição sincronizada com Google Drive (${uniqueCode})`,
-        file_name: sanitizedFileName,
-        file_size: blob.size,
-        mime_type: blob.type || (isPhoto ? 'image/jpeg' : 'video/mp4'),
-        drive_file_id: driveRes.id,
-        drive_folder_id: targetFolder.id,
-        drive_view_url: driveRes.webViewLink,
-        drive_download_url: driveRes.webContentLink,
-        status: 'completed',
-      }).catch(() => {});
-
-      showToast('success', `Mídia "${media.name}" salva com sucesso no Google Drive na pasta "${clientName}"!`);
-      loadData();
-    } catch (err: any) {
-      console.error('Error syncing media to Drive:', err);
-      showToast('error', err.message || 'Falha ao sincronizar mídia com Google Drive.');
-    }
-  };
-
   const handleRunIntegrityCheck = async () => {
     setIsCheckingIntegrity(true);
     try {
-      const driveToken = getCachedToken() || undefined;
-      const report = await api.checkMediaIntegrity(driveToken);
+      const report = await api.checkMediaIntegrity();
       setIntegrityReport(report);
       if (report.has_issues) {
         showToast(
           'error',
-          `Alerta: ${report.issues.length} mídia(s) com problema de integridade ou inacessível no Google Drive!`
+          `Alerta: ${report.issues.length} mídia(s) com problema de acesso encontradas.`
         );
         setShowIntegrityDetails(true);
       } else {
         showToast(
           'success',
-          `Integridade confirmada: todas as ${report.summary.total} mídias estão íntegras e acessíveis!`
+          `Integridade confirmada: todas as ${report.summary.total} mídias estão íntegras e prontas para exibição!`
         );
       }
     } catch (err: any) {
@@ -484,35 +299,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     }
   };
 
-  const handleRepairDrivePermission = async (item: MediaIntegrityItemResult) => {
-    if (!item.drive_file_id) return;
-    const token = getCachedToken();
-    if (!token) {
-      showToast('info', 'Faça login no Google Drive para reparar as permissões do arquivo.');
-      requestGoogleLogin();
-      return;
-    }
-    setRepairingMediaId(item.media_id);
-    try {
-      const ok = await makeDriveFilePublic(token, item.drive_file_id);
-      if (ok) {
-        showToast('success', `Permissão pública concedida para "${item.name}"!`);
-        await handleRunIntegrityCheck();
-      } else {
-        showToast('error', 'Não foi possível definir permissão pública. Verifique se o arquivo ainda existe no Drive.');
-      }
-    } catch (err: any) {
-      showToast('error', err.message || 'Erro ao reparar permissão.');
-    } finally {
-      setRepairingMediaId(null);
-    }
-  };
-
   useEffect(() => {
     loadData();
     // Refresh stats and player status periodically
     const interval = setInterval(() => {
-      api.getCompanyPlayers().then(setPlayers).catch(() => {});
+      api.getCompanyPlayers()
+        .then((pl) => {
+          if (Array.isArray(pl)) setPlayers(pl);
+        })
+        .catch(() => {});
     }, 15000);
     return () => clearInterval(interval);
   }, []);
@@ -623,10 +418,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       }
       setCopiedPlayerId(player.id);
       setTimeout(() => setCopiedPlayerId(null), 3000);
-      showToast(
-        'success',
-        `Link único do player "${player.name}" copiado! Coloque esse link como atalho no aparelho para inicialização automática instantânea.`
-      );
+      showToast('success', 'Link copiado.');
     } catch {
       showToast('error', 'Não foi possível copiar automaticamente para a área de transferência.');
     }
@@ -660,7 +452,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       });
     } else {
       if (stats.limits.max_operators === 0) {
-        showToast('error', 'Seu plano atual é exclusivo para exibição de mídia e notícias RSS (sem operador). Solicite alteração para a Linha Call para habilitar operadores.');
+        showToast('error', 'Plano sem operadores.');
         return;
       }
       setEditingOperator(null);
@@ -785,22 +577,21 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   };
 
   // Add Weather/Clock directly to the currently open playlist form
-  const handleQuickAddWeatherToPlaylist = () => {
+  const handleQuickAddWeatherToPlaylist = async () => {
     let weatherMedia = mediaList.find((m) => m.type === 'weather_clock');
     if (!weatherMedia) {
-      const tempId = `med-${companyInfo?.id || 'company'}-weather`;
-      weatherMedia = {
-        id: tempId,
-        company_id: companyInfo?.id || '',
-        name: 'Hora Certa & Previsão do Tempo',
-        type: 'weather_clock',
-        file_url: 'widget:weather_clock',
-        duration: 12,
-        active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setMediaList((prev) => [weatherMedia!, ...prev]);
+      try {
+        weatherMedia = await api.uploadCompanyMedia({
+          name: 'Hora Certa & Previsão do Tempo',
+          type: 'weather_clock',
+          file_url: 'widget:weather_clock',
+          duration: 12,
+        });
+        setMediaList((prev) => [weatherMedia!, ...prev]);
+      } catch (err: any) {
+        showToast('error', err.message || 'Erro ao criar mídia de Previsão do Tempo.');
+        return;
+      }
     }
 
     setPlaylistForm((prev) => ({
@@ -817,22 +608,21 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
   };
 
   // Add RSS directly to the currently open playlist form
-  const handleQuickAddRssToPlaylist = (rssUrl: string, rssName: string) => {
+  const handleQuickAddRssToPlaylist = async (rssUrl: string, rssName: string) => {
     let rssMedia = mediaList.find((m) => m.type === 'rss' && (m.file_url.trim() === rssUrl.trim() || m.name === rssName));
     if (!rssMedia) {
-      const tempId = `med-${companyInfo?.id || 'company'}-rss-${Date.now()}`;
-      rssMedia = {
-        id: tempId,
-        company_id: companyInfo?.id || '',
-        name: rssName.startsWith('Notícias RSS') ? rssName : `Notícias RSS - ${rssName}`,
-        type: 'rss',
-        file_url: rssUrl,
-        duration: 15,
-        active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setMediaList((prev) => [rssMedia!, ...prev]);
+      try {
+        rssMedia = await api.uploadCompanyMedia({
+          name: rssName.startsWith('Notícias RSS') ? rssName : `Notícias RSS - ${rssName}`,
+          type: 'rss',
+          file_url: rssUrl,
+          duration: 15,
+        });
+        setMediaList((prev) => [rssMedia!, ...prev]);
+      } catch (err: any) {
+        showToast('error', err.message || 'Erro ao criar mídia de Notícias RSS.');
+        return;
+      }
     }
 
     setPlaylistForm((prev) => ({
@@ -966,6 +756,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
   const handleSaveMedia = async (e: React.FormEvent) => {
     e.preventDefault();
+
     const currentMediaCount = mediaList.length;
     const maxMediaLimit = stats?.limits?.max_media || stats?.limits?.max_storage || 20;
     if (currentMediaCount >= maxMediaLimit) {
@@ -979,7 +770,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
     try {
       setIsUploadingMedia(true);
       let targetFileUrl = mediaForm.file_url;
-      let driveMediaData: Partial<Media> = {};
 
       if (mediaSourceType === 'device') {
         if (!selectedDeviceFile) {
@@ -988,237 +778,23 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           return;
         }
 
-        // If Google Drive sync is enabled, save file directly into client's Google Drive folder
-        if (saveToGoogleDrive) {
-          let token = getCachedToken();
+        // Automatic upload through server which stores and syncs to developer's Google Drive
+        await api.uploadCompanyMediaToDriveServer({
+          fileData: selectedDeviceFile.dataUrl,
+          filename: selectedDeviceFile.name,
+          mimeType: selectedDeviceFile.type,
+          name: mediaForm.name.trim() || selectedDeviceFile.name,
+          duration: Number(mediaForm.duration) || 10,
+        });
 
-          if (token) {
-            const clientName = companyInfo?.name || 'Cliente';
-            const structure = await ensureClientFolders(token, clientName);
-            const isPhoto = !selectedDeviceFile.isVideo;
-            const targetFolder = isPhoto
-              ? structure.categoryFolders.photos
-              : structure.categoryFolders.documents;
-            const prefix = isPhoto ? 'FOTO' : 'VID';
-            const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
-            const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
-            const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
-            const sanitizedFileName = `${uniqueCode}_${selectedDeviceFile.name.replace(/\s+/g, '_')}`;
-
-            const fileToUpload = selectedDeviceFile.file || dataUrlToBlob(selectedDeviceFile.dataUrl);
-
-            const uploadRes = await uploadFileToDrive(
-              token,
-              fileToUpload,
-              sanitizedFileName,
-              targetFolder.id,
-              {
-                description: `Mídia indoor carregada pela empresa (${uniqueCode})`,
-                uniqueCode,
-              }
-            );
-
-            // Catalog in Drive Documents
-            await api.createDriveDocument({
-              unique_code: uniqueCode,
-              company_id: companyInfo?.id || '',
-              category: isPhoto ? 'photo' : 'document',
-              title: mediaForm.name.trim() || selectedDeviceFile.name,
-              description: `Mídia para exibição em TVs (${uniqueCode})`,
-              file_name: selectedDeviceFile.name,
-              file_size: selectedDeviceFile.file?.size,
-              mime_type: selectedDeviceFile.type,
-              drive_file_id: uploadRes.id,
-              drive_folder_id: targetFolder.id,
-              drive_view_url: uploadRes.webViewLink,
-              drive_download_url: uploadRes.webContentLink,
-              status: 'completed',
-            }).catch(() => {});
-
-            // Persist client folder URL if needed
-            if (structure?.clientFolder?.webViewLink && !stats?.drive_folder_url) {
-              api.updateCompanyDriveFolder({
-                drive_folder_id: structure.clientFolder.id,
-                drive_folder_url: structure.clientFolder.webViewLink,
-              }).catch(() => {});
-            }
-
-            targetFileUrl = uploadRes.directStreamLink || uploadRes.webViewLink;
-
-            driveMediaData = {
-              drive_file_id: uploadRes.id,
-              drive_folder_id: targetFolder.id,
-              drive_view_url: uploadRes.webViewLink,
-              drive_download_url: uploadRes.webContentLink,
-              unique_code: uniqueCode,
-              source: 'drive',
-              file_size: selectedDeviceFile.file?.size,
-              mime_type: selectedDeviceFile.type,
-            };
-
-            // Local cache backup on server for offline player stability
-            api.uploadFile(
-              selectedDeviceFile.dataUrl,
-              selectedDeviceFile.name,
-              selectedDeviceFile.type
-            ).catch(() => {});
-          } else {
-            // Upload through the system's pre-registered Google Drive connection
-            const serverRes = await api.uploadCompanyMediaToDriveServer({
-              fileData: selectedDeviceFile.dataUrl,
-              filename: selectedDeviceFile.name,
-              mimeType: selectedDeviceFile.type,
-              name: mediaForm.name.trim() || selectedDeviceFile.name,
-              duration: Number(mediaForm.duration) || 10,
-            });
-
-            if (serverRes.savedToDrive && serverRes.media) {
-              showToast(
-                'success',
-                `Mídia "${serverRes.media.name}" salva com sucesso no Google Drive na pasta "${companyInfo?.name || 'Cliente'}"!`
-              );
-              setMediaModalOpen(false);
-              resetMediaModalState();
-              loadData();
-              return;
-            } else {
-              targetFileUrl = serverRes.media?.file_url || '';
-              driveMediaData = {
-                source: 'device',
-                file_size: selectedDeviceFile.file?.size,
-                mime_type: selectedDeviceFile.type,
-              };
-              showToast(
-                'success',
-                'Mídia salva no servidor local (Conecte a conta Google no painel para salvar no Drive).'
-              );
-              setMediaModalOpen(false);
-              resetMediaModalState();
-              loadData();
-              return;
-            }
-          }
-        } else {
-          // Upload file directly to server
-          const uploadRes = await api.uploadFile(
-            selectedDeviceFile.dataUrl,
-            selectedDeviceFile.name,
-            selectedDeviceFile.type
-          );
-          targetFileUrl = uploadRes.url;
-          driveMediaData = {
-            source: 'device',
-            file_size: selectedDeviceFile.file?.size,
-            mime_type: selectedDeviceFile.type,
-          };
-        }
-      } else if (mediaSourceType === 'drive') {
-        if (driveMediaTab === 'select') {
-          if (!selectedDriveDocId) {
-            showToast('error', 'Selecione um arquivo ou foto da lista do Google Drive.');
-            setIsUploadingMedia(false);
-            return;
-          }
-          const chosenDoc = companyDriveDocs.find((d) => d.id === selectedDriveDocId);
-          if (!chosenDoc) {
-            showToast('error', 'Arquivo não encontrado no Google Drive.');
-            setIsUploadingMedia(false);
-            return;
-          }
-          targetFileUrl = chosenDoc.drive_view_url || chosenDoc.drive_download_url;
-          if (!mediaForm.name.trim()) {
-            mediaForm.name = chosenDoc.title;
-          }
-          driveMediaData = {
-            drive_file_id: chosenDoc.drive_file_id,
-            drive_folder_id: chosenDoc.drive_folder_id,
-            drive_view_url: chosenDoc.drive_view_url,
-            drive_download_url: chosenDoc.drive_download_url,
-            unique_code: chosenDoc.unique_code,
-            source: 'drive',
-            file_size: chosenDoc.file_size,
-            mime_type: chosenDoc.mime_type,
-          };
-        } else {
-          // Upload directly to Drive & link as Media
-          if (!driveUploadFile) {
-            showToast('error', 'Selecione uma foto ou arquivo para enviar ao Google Drive.');
-            setIsUploadingMedia(false);
-            return;
-          }
-
-          let token = getCachedToken();
-          if (!token) {
-            showToast('info', 'Conecte sua conta do Google Drive para autorizar o envio.');
-            const authResult = await requestGoogleLogin();
-            if (!authResult?.accessToken) {
-              setIsUploadingMedia(false);
-              return;
-            }
-            token = authResult.accessToken;
-            setHasDriveToken(true);
-          }
-
-          const clientName = companyInfo?.name || 'Cliente';
-          const structure = await ensureClientFolders(token, clientName);
-          const isPhoto = driveUploadFile.type.startsWith('image/');
-          const targetFolder = isPhoto
-            ? structure.categoryFolders.photos
-            : structure.categoryFolders.documents;
-          const prefix = isPhoto ? 'FOTO' : 'DOC';
-          const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
-          const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
-          const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
-          const sanitizedFileName = `${uniqueCode}_${driveUploadFile.name.replace(/\s+/g, '_')}`;
-
-          const uploadRes = await uploadFileToDrive(
-            token,
-            driveUploadFile,
-            sanitizedFileName,
-            targetFolder.id,
-            {
-              description: `Arquivo enviado via painel de mídia (${uniqueCode})`,
-              uniqueCode,
-            }
-          );
-
-          await api.createDriveDocument({
-            unique_code: uniqueCode,
-            company_id: companyInfo?.id || '',
-            category: isPhoto ? 'photo' : 'document',
-            title: mediaForm.name.trim() || driveUploadFile.name,
-            description: `Foto de exibição enviada via formulário com código ${uniqueCode}`,
-            file_name: driveUploadFile.name,
-            file_size: driveUploadFile.size,
-            mime_type: driveUploadFile.type,
-            drive_file_id: uploadRes.id,
-            drive_folder_id: targetFolder.id,
-            drive_view_url: uploadRes.webViewLink,
-            drive_download_url: uploadRes.webContentLink,
-            status: 'completed',
-          });
-
-          // Also persist the client folder URL if not yet saved on the company record
-          if (structure?.clientFolder?.webViewLink && !stats?.drive_folder_url) {
-            api.updateCompanyDriveFolder({
-              drive_folder_id: structure.clientFolder.id,
-              drive_folder_url: structure.clientFolder.webViewLink,
-            }).catch(() => {});
-          }
-
-          targetFileUrl = uploadRes.directStreamLink || uploadRes.webViewLink;
-
-          driveMediaData = {
-            drive_file_id: uploadRes.id,
-            drive_folder_id: targetFolder.id,
-            drive_view_url: uploadRes.webViewLink,
-            drive_download_url: uploadRes.webContentLink,
-            unique_code: uniqueCode,
-            source: 'drive',
-            file_size: driveUploadFile.size,
-            mime_type: driveUploadFile.type,
-          };
-        }
+        showToast(
+          'success',
+          `Mídia "${mediaForm.name.trim() || selectedDeviceFile.name}" salva com sucesso!`
+        );
+        setMediaModalOpen(false);
+        resetMediaModalState();
+        loadData();
+        return;
       } else if (mediaSourceType === 'weather_clock') {
         targetFileUrl = 'widget:weather_clock';
       } else if (mediaSourceType === 'rss') {
@@ -1241,18 +817,11 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         type: mediaSourceType === 'weather_clock' ? 'weather_clock' : mediaSourceType === 'rss' ? 'rss' : mediaForm.type,
         file_url: targetFileUrl,
         duration: Number(mediaForm.duration) || 10,
-        ...driveMediaData,
       });
 
       showToast(
         'success',
-        driveMediaData.drive_file_id
-          ? `Mídia "${mediaForm.name.trim() || 'Nova Mídia'}" salva com sucesso no Google Drive na pasta "${companyInfo?.name || 'Cliente'}"!`
-          : mediaSourceType === 'device'
-          ? 'Mídia carregada diretamente do dispositivo com sucesso!'
-          : mediaSourceType === 'drive'
-          ? 'Foto/Arquivo vinculado do Google Drive com sucesso!'
-          : mediaSourceType === 'rss'
+        mediaSourceType === 'rss'
           ? 'Mídia de Notícias RSS em Tela Inteira cadastrada com sucesso!'
           : 'Mídia cadastrada com sucesso.'
       );
@@ -1445,7 +1014,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-700 pb-5 mb-8">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight uppercase">Painel da Empresa</h2>
-          <p className="text-xs text-slate-400 mt-0.5 tracking-wider">Gestão de players, operadores, playlists e mídias</p>
         </div>
 
         {/* Scrollable sub-tabs for mobile touch */}
@@ -1510,18 +1078,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           >
             RSS ({rssList.length})
           </button>
-          <button
-            id="tab-company-files"
-            onClick={() => setActiveTab('files')}
-            className={`shrink-0 whitespace-nowrap min-h-[40px] px-3.5 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'files'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60'
-            }`}
-          >
-            <UploadCloud className="w-3.5 h-3.5 text-blue-400" />
-            <span>Google Drive / Arquivos</span>
-          </button>
         </div>
       </div>
 
@@ -1555,7 +1111,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <Users className="h-4 w-4 text-emerald-400" />
               </div>
               <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.operatorsCount}</p>
-              <p className="mt-2 text-xs text-slate-400">Atendentes autorizados</p>
             </div>
 
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-5 shadow-sm">
@@ -1566,7 +1121,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <Film className="h-4 w-4 text-purple-400" />
               </div>
               <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.playlistsCount}</p>
-              <p className="mt-2 text-xs text-slate-400">Grades de reprodução</p>
             </div>
 
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-5 shadow-sm">
@@ -1577,7 +1131,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <ImageIcon className="h-4 w-4 text-amber-400" />
               </div>
               <p className="mt-2 text-2xl font-bold text-white tracking-tight">{stats.mediaCount}</p>
-              <p className="mt-2 text-xs text-slate-400">Imagens e vídeos</p>
             </div>
           </div>
 
@@ -1586,11 +1139,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Limites do Plano: {stats.plan?.name || 'Plano Personalizado'}
+                  Plano: {stats.plan?.name || 'Personalizado'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Consumo em tempo real em relação à cota máxima contratada
-                </p>
               </div>
               <span className="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800/80">
                 R$ {Number(stats.plan?.monthly_price || 0).toFixed(2)}/mês
@@ -1641,7 +1191,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
               {/* Storage / Media limit */}
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Cota de Mídias (Google Drive / Nuvem)</span>
+                  <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Cota de Mídias (Armazenamento em Nuvem)</span>
                   <span className="font-semibold text-white">
                     {stats.mediaCount} / {stats.limits.max_media || stats.limits.max_storage || 20}
                   </span>
@@ -1672,7 +1222,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider text-white">Players de Mídia</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Pontos de exibição instalados em TVs e monitores</p>
             </div>
             <button
               onClick={() => handleOpenPlayerModal()}
@@ -2039,27 +1588,17 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
       {activeTab === 'operators' && (
         <div className="space-y-6">
           {stats.limits.max_operators === 0 && (
-            <div className="rounded-xl border border-amber-800/80 bg-amber-950/40 p-4 text-amber-200 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-amber-900/60 p-2 text-amber-300">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-100">
-                    Plano de Exibição / Sem Operador ({stats.plan?.name || 'Linha Show'})
-                  </h4>
-                  <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
-                    Este plano foi configurado exclusivamente para transmissão de mídias institucionais, propagandas, previsão do tempo, relógio e notícias RSS na tela sem chamadas de guichê. Caso necessite chamar senhas ou clientes, solicite a alteração para um dos planos da <strong>Linha Call</strong> (com 4 operadores por tela).
-                  </p>
-                </div>
-              </div>
+            <div className="rounded-xl border border-amber-800/80 bg-amber-950/40 p-3 text-amber-200 shadow-sm flex items-center gap-2.5">
+              <Users className="h-4 w-4 text-amber-300 shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-100">
+                Plano sem Operador ({stats.plan?.name || 'Linha Show'})
+              </span>
             </div>
           )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Operadores de Atendimento</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Usuários autorizados a realizar chamadas nos players</p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Operadores</h3>
             </div>
             <button
               onClick={() => handleOpenOperatorModal()}
@@ -2241,8 +1780,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Playlists de Exibição</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Monte grades de conteúdo e ordene a reprodução</p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Playlists</h3>
             </div>
             <button
               onClick={() => handleOpenPlaylistModal()}
@@ -2383,10 +1921,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Biblioteca de Mídias</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Arquivos do Google Drive, mídias locais e widgets de clima conectados ao Firebase
-              </p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Mídias</h3>
             </div>
             <div className="flex items-center gap-2.5">
               <button
@@ -2395,7 +1930,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 onClick={handleRunIntegrityCheck}
                 disabled={isCheckingIntegrity}
                 className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/90 px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-slate-200 shadow-sm hover:bg-slate-700 hover:text-white transition cursor-pointer disabled:opacity-50"
-                title="Verifica se todas as mídias salvas no Firebase ainda existem e estão acessíveis no Google Drive"
+                title="Verifica se todas as mídias salvas estão acessíveis e prontas para as telas"
               >
                 <ShieldCheck className={`h-4 w-4 ${isCheckingIntegrity ? 'animate-spin text-blue-400' : 'text-emerald-400'}`} />
                 <span>{isCheckingIntegrity ? 'Auditando...' : 'Verificar Integridade'}</span>
@@ -2415,107 +1950,61 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </div>
           </div>
 
-          {/* PAINEL DE STATUS GOOGLE DRIVE & COTA DE MÍDIAS POR CLIENTE */}
+          {/* COTA DE MÍDIAS E ARMAZENAMENTO */}
           <div className="rounded-xl border border-slate-700/80 bg-slate-850 p-4 sm:p-5 shadow-sm space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-700/60">
-              {/* LADO ESQUERDO: INTEGRAÇÃO COM GOOGLE DRIVE & PASTAS DEDICADAS */}
-              <div className="space-y-3 md:pr-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                      <Folder className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">Google Drive do Cliente</h4>
-                      <p className="text-[11px] text-slate-400">Pastas dedicadas e separadas por empresa</p>
-                    </div>
-                  </div>
-
-                  {!getCachedToken() ? (
-                    <button
-                      type="button"
-                      onClick={requestGoogleLogin}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition cursor-pointer shadow-xs"
-                    >
-                      <UploadCloud className="h-3.5 w-3.5" />
-                      <span>Conectar Drive</span>
-                    </button>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700/80 text-emerald-400 text-[11px] font-semibold">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Drive Conectado
-                    </span>
-                  )}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0">
+                  <Film className="h-5 w-5" />
                 </div>
-
-                <div className="rounded-lg bg-slate-900/80 border border-slate-800 p-3 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 text-[11px]">Pasta Raiz:</span>
-                    <span className="font-mono text-[11px] font-bold text-white truncate max-w-[200px]">
-                      MÍDIA INDOOR / {companyInfo?.name || 'Cliente'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 text-[11px]">Subpastas do Cliente:</span>
-                    <span className="text-[11px] text-blue-400 font-medium">📸 Fotos e Mídias • 📄 Documentos</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
-                    Todas as mídias salvas via Drive são direcionadas automaticamente para a pasta exclusiva deste cliente, sem misturar com outros estabelecimentos.
-                  </p>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">Cota de Mídias</h4>
                 </div>
               </div>
 
-              {/* LADO DIREITO: LIMITAÇÃO DE MÍDIAS POR CLIENTE (COTA) */}
-              <div className="space-y-3 pt-4 md:pt-0 md:pl-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-lg bg-purple-600/20 text-purple-400 border border-purple-500/30">
-                      <Film className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-white">Cota de Mídias Cadastradas</h4>
-                      <p className="text-[11px] text-slate-400">Limite de arquivos permitidos neste plano</p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-white">
-                      {mediaList.length} / {stats?.limits?.max_media || stats?.limits?.max_storage || 20}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block uppercase tracking-wider">mídias</span>
-                  </div>
-                </div>
-
-                {/* BARRA DE PROGRESSO DA COTA */}
+              <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800 px-4 py-2 rounded-xl">
                 <div>
-                  <div className="h-2.5 w-full rounded-full bg-slate-900 border border-slate-700/60 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20)
-                          ? 'bg-rose-500'
-                          : mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20) >= 0.8
-                          ? 'bg-amber-500'
-                          : 'bg-emerald-500'
-                      }`}
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          (mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20)) * 100
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between mt-1 text-[10px]">
-                    <span className="text-slate-400">
-                      {Math.max(0, (stats?.limits?.max_media || stats?.limits?.max_storage || 20) - mediaList.length)} vaga(s) disponível(is)
-                    </span>
-                    {mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) && (
-                      <span className="font-bold text-rose-400">
-                        Limite de mídias atingido!
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Mídias Utilizadas</span>
+                  <span className="text-sm font-bold text-white">
+                    {mediaList.length} <span className="text-xs text-slate-400 font-normal">/ {stats?.limits?.max_media || stats?.limits?.max_storage || 20}</span>
+                  </span>
                 </div>
+                <div className="h-8 w-px bg-slate-700 mx-1" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-700/80 text-emerald-400 text-[11px] font-semibold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Nuvem Ativa
+                </span>
+              </div>
+            </div>
+
+            {/* BARRA DE PROGRESSO DA COTA */}
+            <div>
+              <div className="h-2 w-full rounded-full bg-slate-900 border border-slate-700/60 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20)
+                      ? 'bg-rose-500'
+                      : mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20) >= 0.8
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500'
+                  }`}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (mediaList.length / (stats?.limits?.max_media || stats?.limits?.max_storage || 20)) * 100
+                    )}%`,
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-1 text-[10px]">
+                <span className="text-slate-400">
+                  {Math.max(0, (stats?.limits?.max_media || stats?.limits?.max_storage || 20) - mediaList.length)} vaga(s) disponível(is)
+                </span>
+                {mediaList.length >= (stats?.limits?.max_media || stats?.limits?.max_storage || 20) && (
+                  <span className="font-bold text-rose-400">
+                    Limite de mídias atingido!
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -2548,18 +2037,13 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-white">
                         {integrityReport.has_issues
-                          ? `Alerta: ${integrityReport.issues.length} mídia(s) com problema de integridade ou inacessível no Google Drive`
-                          : `Integridade 100% Confirmada (${integrityReport.summary.total} mídias auditadas)`}
+                          ? `${integrityReport.issues.length} mídia(s) com falha`
+                          : `Integridade OK (${integrityReport.summary.total})`}
                       </h4>
                       <span className="text-[11px] text-slate-400 font-mono">
-                        Última checagem: {new Date(integrityReport.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {new Date(integrityReport.checked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-0.5">
-                      {integrityReport.has_issues
-                        ? 'Arquivos excluídos ou restritos no Google Drive que podem causar tela preta nos terminais. Corrija abaixo para evitar falhas de exibição.'
-                        : 'Todos os arquivos do Google Drive, URLs locais e widgets sincronizados no Firebase estão acessíveis e prontos para as TVs.'}
-                    </p>
                   </div>
                 </div>
 
@@ -2602,7 +2086,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                             <div>
                               <span className="text-xs font-bold text-white block">{issue.name}</span>
                               <span className="text-[10px] text-slate-400 uppercase font-mono">
-                                Origem: {issue.source === 'google_drive' ? 'Google Drive' : issue.source}
+                                Origem: {issue.source === 'google_drive' ? 'Nuvem' : issue.source}
                               </span>
                             </div>
                             <span className="rounded bg-rose-900/80 border border-rose-600 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-200">
@@ -2632,28 +2116,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
                         {/* Action buttons */}
                         <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
-                          {issue.source === 'google_drive' && issue.status === 'permission_denied' && (
-                            <button
-                              type="button"
-                              onClick={() => handleRepairDrivePermission(issue)}
-                              disabled={repairingMediaId === issue.media_id}
-                              className="flex items-center gap-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold px-2.5 py-1 transition cursor-pointer"
-                            >
-                              <ShieldCheck className="h-3 w-3" />
-                              <span>{repairingMediaId === issue.media_id ? 'Reparando...' : 'Liberar Permissão no Drive'}</span>
-                            </button>
-                          )}
-                          {issue.source === 'google_drive' && issue.drive_file_id && (
-                            <a
-                              href={`https://drive.google.com/file/d/${issue.drive_file_id}/view`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-medium"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              <span>Ver no Drive</span>
-                            </a>
-                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -2694,16 +2156,16 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       title={itemIntegrity.message}
                     >
                       <AlertTriangle className="h-3 w-3 text-rose-400 shrink-0" />
-                      <span className="truncate max-w-[120px]">Inacessível no Drive</span>
+                      <span className="truncate max-w-[120px]">Inacessível</span>
                     </div>
                   )}
                   {itemIntegrity && itemIntegrity.healthy && itemIntegrity.source === 'google_drive' && (
                     <div
                       className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded bg-emerald-950/80 border border-emerald-700/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 shadow-sm"
-                      title="Arquivo verificado e acessível no Google Drive"
+                      title="Arquivo verificado e acessível na nuvem"
                     >
                       <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
-                      <span>Drive OK</span>
+                      <span>Nuvem OK</span>
                     </div>
                   )}
                   
@@ -2722,9 +2184,9 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-bold text-white text-sm truncate flex-1" title={m.name}>{m.name}</h4>
                     {m.drive_file_id && (
-                      <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800/70 text-blue-300 flex items-center gap-1" title="Armazenado no Google Drive da Empresa">
+                      <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800/70 text-blue-300 flex items-center gap-1" title="Armazenado na nuvem">
                         <Folder className="h-3 w-3 text-blue-400" />
-                        Drive
+                        Nuvem
                       </span>
                     )}
                   </div>
@@ -2748,22 +2210,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                           target="_blank"
                           rel="noreferrer"
                           className="text-blue-400 hover:text-blue-300 p-1.5 rounded-lg hover:bg-slate-700 transition cursor-pointer"
-                          title="Abrir arquivo no Google Drive"
+                          title="Abrir arquivo original"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
-                      )}
-
-                      {!m.drive_file_id && m.source !== 'drive' && (
-                        <button
-                          type="button"
-                          onClick={() => handleSyncMediaToDrive(m)}
-                          className="text-amber-400 hover:text-amber-300 px-2 py-1 rounded-lg hover:bg-slate-700 transition cursor-pointer flex items-center gap-1 text-[11px] font-semibold"
-                          title="Enviar este arquivo para a pasta da Empresa no Google Drive"
-                        >
-                          <Folder className="h-3 w-3" />
-                          <span className="hidden sm:inline">Drive</span>
-                        </button>
                       )}
 
                       <button
@@ -2798,10 +2248,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Feeds RSS (Letreiro de Notícias)</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Os títulos são exibidos automaticamente na barra inferior dos players ou como mídia de tela inteira
-              </p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Feeds RSS</h3>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <button
@@ -2809,7 +2256,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 onClick={handleLoadDefaultRss}
                 disabled={isLoadingDefaultRss}
                 className="min-h-[44px] flex items-center justify-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-200 transition cursor-pointer disabled:opacity-50"
-                title="Sincronizar e recarregar os feeds padrão para o cliente"
               >
                 {isLoadingDefaultRss ? (
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-400" />
@@ -2829,46 +2275,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             </div>
           </div>
 
-          {/* BANNER EXPLICATIVO: COMO INCLUIR RSS NA PLAYLIST */}
-          <div className="rounded-xl border border-rose-500/30 bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0 mt-0.5 sm:mt-0">
-                <Newspaper className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  Como usar Notícias RSS nas suas Telas
-                </h4>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  Os canais RSS ativos abaixo alimentam o <strong>letreiro de rodapé</strong> do player automaticamente. Para exibir as notícias com fotos em <strong>slides de tela cheia</strong> dentro de qualquer playlist, clique no botão <span className="text-rose-300 font-bold bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-800/60">+ Na Playlist</span> de qualquer canal!
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('playlists');
-                handleOpenPlaylistModal();
-              }}
-              className="shrink-0 whitespace-nowrap min-h-[38px] px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
-            >
-              <ListPlus className="h-4 w-4" />
-              <span>Ver / Criar Playlist</span>
-            </button>
-          </div>
-
           {/* PAINEL DE CANAIS PRONTOS PARA USO */}
           <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-400" />
                 <span className="text-xs font-bold uppercase tracking-wider text-white">
-                  Canais Sugeridos Prontos para Usar
+                  Canais Sugeridos
                 </span>
               </div>
-              <span className="text-[11px] text-slate-400">
-                Carregados automaticamente para todos os novos clientes
-              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
@@ -2888,9 +2303,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                           {preset.category}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                        {preset.description}
-                      </p>
                     </div>
 
                     <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
@@ -3072,39 +2484,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         </div>
       )}
 
-      {/* VIEW: GOOGLE DRIVE & ARQUIVOS DOS CLIENTES */}
-      {activeTab === 'files' && (
-        <GoogleDriveFileManager
-          companies={
-            companyInfo
-              ? [
-                  {
-                    id: companyInfo.id,
-                    legal_name: companyInfo.name,
-                    trade_name: companyInfo.name,
-                    cnpj: '',
-                    email: '',
-                    phone: '',
-                    responsible: '',
-                    address: '',
-                    city: '',
-                    state: '',
-                    plan_id: '',
-                    start_date: '',
-                    due_date: '',
-                    status: 'active',
-                    created_at: '',
-                    updated_at: '',
-                  },
-                ]
-              : []
-          }
-          currentCompanyId={companyInfo?.id}
-          isDevAdmin={false}
-          showToast={showToast}
-        />
-      )}
-
       {/* MODAL PLAYER */}
       {playerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-xs">
@@ -3185,15 +2564,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         </span>
                         <Tv className="h-4 w-4 text-blue-400 shrink-0" />
                       </div>
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
                         <div className="w-9 h-5 rounded border border-current flex items-center justify-center text-[8px] font-mono font-bold">
                           16:9
                         </div>
                         <span className="text-xs font-semibold text-white">1920 × 1080 px</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-tight">
-                        Smart TVs, Monitores em Modo Paisagem
-                      </p>
                     </button>
 
                     <button
@@ -3211,15 +2587,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         </span>
                         <Smartphone className="h-4 w-4 text-emerald-400 shrink-0" />
                       </div>
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
                         <div className="w-5 h-8 rounded border border-current flex items-center justify-center text-[8px] font-mono font-bold">
                           9:16
                         </div>
                         <span className="text-xs font-semibold text-white">1080 × 1920 px</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-tight">
-                        Totens Digitais, Telas em Modo Retrato
-                      </p>
                     </button>
                   </div>
                 </div>
@@ -3301,9 +2674,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         <ExternalLink className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <p className="text-[10px] text-slate-400 leading-tight">
-                      Abra este link em qualquer TV ou dispositivo de reprodução. O player iniciará automaticamente sem pedir login, senha ou código.
-                    </p>
                   </div>
                 )}
               </div>
@@ -3469,28 +2839,23 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <span>Cidade do Widget de Clima / Temperatura</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Fixo no rodapé do player</span>
+                  <label className="block font-semibold text-slate-300 mb-1">
+                    Cidade (Clima)
                   </label>
                   <input
                     type="text"
                     value={playlistForm.weather_city}
                     onChange={(e) => setPlaylistForm({ ...playlistForm, weather_city: e.target.value })}
-                    placeholder="Ex: São Paulo, Campinas, Belo Horizonte, Rio de Janeiro"
+                    placeholder="Ex: São Paulo, Campinas, Belo Horizonte"
                     className="w-full min-h-[44px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                   />
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    O player buscará a temperatura e clima em tempo real para exibir de forma fixa no ticker da tela.
-                  </p>
                 </div>
 
                 {/* Itens na Playlist */}
                 <div className="border-t border-slate-800 pt-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                     <div>
-                      <label className="font-semibold text-slate-300 block">Itens e Sequência da Grade</label>
-                      <span className="text-[11px] text-slate-400">Arraste ou ordene a sequência e defina o tempo de cada tela</span>
+                      <label className="font-semibold text-slate-300 block">Sequência</label>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <button
@@ -3526,12 +2891,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                     {playlistForm.items.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-700 p-5 bg-slate-900/60 my-2 space-y-3">
-                        <div className="text-center">
-                          <Film className="h-7 w-7 text-slate-500 mx-auto mb-1.5" />
-                          <p className="text-slate-200 font-bold text-xs">Sua playlist está sem mídias na sequência</p>
-                          <p className="text-slate-400 text-[11px]">Escolha abaixo o que deseja exibir nesta tela:</p>
-                        </div>
+                      <div className="rounded-xl border border-dashed border-slate-700 p-4 bg-slate-900/60 my-2 space-y-2">
+                        <p className="text-slate-300 font-bold text-xs text-center">Sem itens na playlist</p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                           <button
                             type="button"
@@ -3539,11 +2900,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                             className="p-2.5 rounded-xl border border-amber-500/40 bg-amber-950/30 hover:bg-amber-900/40 text-left transition cursor-pointer group"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <CloudSun className="h-5 w-5 text-amber-400" />
+                              <CloudSun className="h-4 w-4 text-amber-400" />
                               <span className="text-[10px] font-bold text-amber-400 uppercase">+ Adicionar</span>
                             </div>
-                            <p className="text-xs font-bold text-white group-hover:text-amber-200">Clima & Hora</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Previsão do tempo e relógio sincronizado</p>
+                            <p className="text-xs font-bold text-white">Clima & Hora</p>
                           </button>
 
                           <button
@@ -3552,11 +2912,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                             className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-950/30 hover:bg-rose-900/40 text-left transition cursor-pointer group"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <Newspaper className="h-5 w-5 text-rose-400" />
+                              <Newspaper className="h-4 w-4 text-rose-400" />
                               <span className="text-[10px] font-bold text-rose-400 uppercase">+ Escolher</span>
                             </div>
-                            <p className="text-xs font-bold text-white group-hover:text-rose-200">Notícias RSS</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Manchetes do G1, UOL e jornais em tela cheia</p>
+                            <p className="text-xs font-bold text-white">Notícias RSS</p>
                           </button>
 
                           <button
@@ -3565,11 +2924,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                             className="p-2.5 rounded-xl border border-blue-500/40 bg-blue-950/30 hover:bg-blue-900/40 text-left transition cursor-pointer group"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <Film className="h-5 w-5 text-blue-400" />
+                              <Film className="h-4 w-4 text-blue-400" />
                               <span className="text-[10px] font-bold text-blue-400 uppercase">+ Abrir</span>
                             </div>
-                            <p className="text-xs font-bold text-white group-hover:text-blue-200">Biblioteca</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Fotos, vídeos e arquivos institucionais</p>
+                            <p className="text-xs font-bold text-white">Biblioteca</p>
                           </button>
                         </div>
                       </div>
@@ -3760,9 +3118,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                   <Film className="h-5 w-5 text-blue-400 shrink-0" />
                   <span>Selecionar Mídia</span>
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-                  Toque na mídia para adicioná-la à sequência
-                </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -3835,7 +3190,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <div className="py-12 text-center">
                   <Film className="h-10 w-10 text-slate-600 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-slate-300">Nenhuma mídia encontrada</p>
-                  <p className="text-xs text-slate-500 mt-1">Carregue imagens, vídeos ou notícias RSS para adicionar à playlist.</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -3939,8 +3293,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                   <UploadCloud className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white leading-tight">Cadastrar Nova Mídia</h3>
-                  <p className="text-[11px] text-slate-400">Arquivos do dispositivo ou links externos</p>
+                  <h3 className="text-base font-bold text-white leading-tight">Cadastrar Mídia</h3>
                 </div>
               </div>
               <button
@@ -3957,7 +3310,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 {/* SELETOR DE ORIGEM DA MÍDIA */}
                 <div>
                   <label className="block font-semibold text-slate-300 mb-1.5 text-xs">Origem da Mídia</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -3977,25 +3330,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     >
                       <HardDrive className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">Dispositivo</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMediaSourceType('drive');
-                        loadCompanyDriveDocs();
-                        if (mediaForm.file_url === 'widget:weather_clock') {
-                          setMediaForm((prev) => ({ ...prev, file_url: '' }));
-                        }
-                      }}
-                      className={`min-h-[42px] flex items-center justify-center gap-1.5 p-2 rounded-lg text-xs font-bold transition cursor-pointer border ${
-                        mediaSourceType === 'drive'
-                          ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
-                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white'
-                      }`}
-                    >
-                      <Folder className="h-3.5 w-3.5 shrink-0 text-blue-300" />
-                      <span className="truncate">Google Drive</span>
                     </button>
 
                     <button
@@ -4175,323 +3509,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       </div>
                     </div>
                   )}
-
-                  {/* CONFIGURAÇÃO DO GOOGLE DRIVE PARA O ARQUIVO CARREGADO */}
-                  <div className="mt-3.5 rounded-xl border border-blue-900/60 bg-blue-950/30 p-3.5 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="p-2 rounded-lg bg-blue-600/20 text-blue-400 shrink-0 mt-0.5">
-                          <Folder className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-2 font-bold text-xs text-white cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={saveToGoogleDrive}
-                              onChange={(e) => setSaveToGoogleDrive(e.target.checked)}
-                              className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                            <span>Salvar no Google Drive da Empresa</span>
-                          </label>
-                          <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                            Organiza o arquivo na nuvem com código único e subpastas de categorias (Fotos / Documentos).
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status da Conta Conectada */}
-                      {hasDriveToken || getCachedToken() ? (
-                        <span className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/70 border border-emerald-700 text-emerald-300 text-[10px] font-bold">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Drive Conectado
-                        </span>
-                      ) : driveSettings.connected ? (
-                        <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-950/80 border border-blue-700 text-blue-300 text-[10px] font-semibold">
-                          Conta Cadastrada
-                        </span>
-                      ) : (
-                        <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-950/70 border border-amber-800 text-amber-300 text-[10px] font-semibold">
-                          Não Conectado
-                        </span>
-                      )}
-                    </div>
-
-                    {saveToGoogleDrive && (
-                      <div className="pt-2 border-t border-blue-900/40 text-xs space-y-2">
-                        {driveSettings.connected && driveSettings.account_email ? (
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
-                            <div className="min-w-0">
-                              <p className="text-[11px] text-slate-400 font-medium">Conta Google Vinculada:</p>
-                              <p className="text-xs font-bold text-white truncate flex items-center gap-1.5 mt-0.5">
-                                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                                {driveSettings.account_email}
-                              </p>
-                              <p className="text-[10px] text-blue-300 mt-0.5 truncate">
-                                📁 Pasta: MÍDIA INDOOR / {companyInfo?.name || 'Empresa'} / {selectedDeviceFile?.isVideo ? '📄 Documentos' : '📸 Fotos'}
-                              </p>
-                            </div>
-                            {!hasDriveToken && !getCachedToken() && (
-                              <button
-                                type="button"
-                                onClick={handleConnectGoogleDrive}
-                                disabled={isConnectingDrive}
-                                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition cursor-pointer flex items-center gap-1"
-                              >
-                                {isConnectingDrive ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
-                                Autorizar Sessão
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="bg-amber-950/30 border border-amber-800/40 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div>
-                              <p className="text-xs font-bold text-amber-300">
-                                Conecte a conta Google cadastrada
-                              </p>
-                              <p className="text-[11px] text-slate-300 mt-0.5">
-                                Conecte uma vez para permitir que o app salve seus arquivos automaticamente no Google Drive.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleConnectGoogleDrive}
-                              disabled={isConnectingDrive}
-                              className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                            >
-                              {isConnectingDrive ? (
-                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Folder className="h-3.5 w-3.5" />
-                              )}
-                              <span>Conectar Google Drive</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* GOOGLE DRIVE: SELEÇÃO OU UPLOAD */}
-              {mediaSourceType === 'drive' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-950/30 border border-blue-800/40">
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-4 w-4 text-blue-400" />
-                      <div>
-                        <p className="font-bold text-white text-xs">Google Drive da Empresa</p>
-                        <p className="text-[10px] text-slate-400">
-                          {companyInfo?.name ? `Pasta: Painel_TV_Empresas / ${companyInfo.name}` : 'Arquivos organizados na nuvem'}
-                        </p>
-                      </div>
-                    </div>
-                    {!getCachedToken() ? (
-                      <button
-                        type="button"
-                        onClick={requestGoogleLogin}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] uppercase transition cursor-pointer"
-                      >
-                        Conectar Drive
-                      </button>
-                    ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                        Conectado
-                      </span>
-                    )}
-                  </div>
-
-                  {/* SUB-TABS: SELECIONAR OU ENVIAR NOVO */}
-                  <div className="flex border-b border-slate-700/80 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDriveMediaTab('select')}
-                      className={`pb-2 px-1 text-xs font-semibold border-b-2 transition cursor-pointer ${
-                        driveMediaTab === 'select'
-                          ? 'border-blue-500 text-blue-400'
-                          : 'border-transparent text-slate-400 hover:text-slate-300'
-                      }`}
-                    >
-                      Selecionar do Arquivo ({companyDriveDocs.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDriveMediaTab('upload')}
-                      className={`pb-2 px-1 text-xs font-semibold border-b-2 transition cursor-pointer ${
-                        driveMediaTab === 'upload'
-                          ? 'border-blue-500 text-blue-400'
-                          : 'border-transparent text-slate-400 hover:text-slate-300'
-                      }`}
-                    >
-                      Enviar Nova Foto para o Drive
-                    </button>
-                  </div>
-
-                  {/* ABA 1: SELEÇÃO DE ARQUIVO JÁ NO DRIVE */}
-                  {driveMediaTab === 'select' && (
-                    <div className="space-y-2">
-                      {isLoadingDriveDocs ? (
-                        <div className="p-6 text-center text-slate-400 text-xs">
-                          <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-blue-400" />
-                          Carregando arquivos da empresa...
-                        </div>
-                      ) : companyDriveDocs.length === 0 ? (
-                        <div className="p-6 text-center rounded-xl border border-dashed border-slate-700 bg-slate-800/40 text-slate-400 space-y-2">
-                          <Folder className="h-6 w-6 mx-auto text-slate-500" />
-                          <p className="text-xs font-semibold text-slate-300">Nenhum arquivo encontrado no Drive desta empresa.</p>
-                          <p className="text-[11px] text-slate-400">
-                            Clique na aba "Enviar Nova Foto para o Drive" para enviar sua primeira foto com código único.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => setDriveMediaTab('upload')}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-500 transition cursor-pointer"
-                          >
-                            Enviar Foto Agora
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                          {companyDriveDocs.map((doc) => {
-                            const isSelected = selectedDriveDocId === doc.id;
-                            return (
-                              <div
-                                key={doc.id}
-                                onClick={() => {
-                                  setSelectedDriveDocId(doc.id);
-                                  setMediaForm((prev) => ({
-                                    ...prev,
-                                    name: prev.name.trim() || doc.title,
-                                    file_url: doc.drive_view_url || doc.drive_download_url || '',
-                                    type: doc.category === 'photo' ? 'image' : 'image',
-                                  }));
-                                }}
-                                className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
-                                  isSelected
-                                    ? 'border-blue-500 bg-blue-950/40 text-white shadow-sm ring-1 ring-blue-500'
-                                    : 'border-slate-700/80 bg-slate-800/60 hover:bg-slate-800 text-slate-300'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="h-9 w-9 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400 overflow-hidden">
-                                    {doc.drive_view_url && (doc.mime_type?.startsWith('image/') || doc.category === 'photo') ? (
-                                      <img
-                                        src={doc.drive_view_url}
-                                        alt={doc.title}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => {
-                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                        }}
-                                      />
-                                    ) : (
-                                      <FileText className="h-4 w-4 text-blue-400" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="font-bold text-xs text-white truncate">{doc.title}</p>
-                                      <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-blue-300 border border-slate-700 shrink-0">
-                                        {doc.unique_code}
-                                      </span>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 truncate">
-                                      {doc.file_name} • {formatFileSize(doc.file_size || 0)}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="shrink-0">
-                                  {isSelected ? (
-                                    <div className="h-5 w-5 rounded-full bg-blue-500 text-white flex items-center justify-center">
-                                      <Check className="h-3 w-3" />
-                                    </div>
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full border border-slate-600" />
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ABA 2: ENVIAR NOVO ARQUIVO / FOTO DIRETAMENTE PARA O GOOGLE DRIVE */}
-                  {driveMediaTab === 'upload' && (
-                    <div className="space-y-3">
-                      <input
-                        ref={driveFileInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setDriveUploadFile(file);
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setDriveUploadPreview(reader.result as string);
-                              const autoTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-                              setMediaForm((prev) => ({
-                                ...prev,
-                                name: prev.name.trim() === '' ? autoTitle : prev.name,
-                                type: file.type.startsWith('video/') ? 'video' : 'image',
-                              }));
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-
-                      {!driveUploadFile ? (
-                        <div
-                          onClick={() => driveFileInputRef.current?.click()}
-                          className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition border-slate-700 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-500 text-slate-400"
-                        >
-                          <div className="p-3 rounded-full bg-emerald-600/10 text-emerald-400 mb-2.5">
-                            <UploadCloud className="h-6 w-6" />
-                          </div>
-                          <p className="text-sm font-bold text-white mb-1">
-                            Clique para escolher a foto ou vídeo
-                          </p>
-                          <p className="text-[11px] text-slate-400 max-w-xs">
-                            Será salvo na pasta <strong>Fotos com Código Único</strong> do Google Drive e sincronizado nesta tela
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-slate-700 bg-slate-800/90 p-3 space-y-2">
-                          <div className="relative rounded-lg overflow-hidden bg-black/60 border border-slate-700 flex items-center justify-center max-h-40">
-                            {driveUploadFile.type.startsWith('video/') ? (
-                              <video src={driveUploadPreview || ''} className="w-full max-h-40 object-contain" controls />
-                            ) : (
-                              <img src={driveUploadPreview || ''} alt="Prévia" className="w-full max-h-40 object-contain" />
-                            )}
-                            <span className="absolute top-2 left-2 rounded px-2 py-0.5 text-[9px] font-extrabold uppercase bg-emerald-950/90 border border-emerald-700 text-emerald-300">
-                              Pronto para Enviar ao Drive
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="truncate pr-2">
-                              <p className="font-bold text-white truncate">{driveUploadFile.name}</p>
-                              <p className="text-[10px] text-slate-400">{formatFileSize(driveUploadFile.size)}</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDriveUploadFile(null);
-                                setDriveUploadPreview(null);
-                                if (driveFileInputRef.current) driveFileInputRef.current.value = '';
-                              }}
-                              className="text-xs text-rose-400 hover:underline cursor-pointer"
-                            >
-                              Remover
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -4542,9 +3559,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       placeholder="https://exemplo.com/imagem.jpg ou https://exemplo.com/video.mp4"
                       className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-xs"
                     />
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Insira o link direto de imagens (JPG, PNG, WEBP) ou vídeos (MP4, WebM) hospedados na web.
-                    </p>
                   </div>
 
                   {/* LIVE PREVIEW BOX */}
@@ -4589,20 +3603,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
               {/* 3. NOTÍCIAS RSS EM TELA INTEIRA */}
               {mediaSourceType === 'rss' && (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-rose-500/40 bg-rose-950/20 p-3 text-xs text-rose-200 space-y-1.5">
-                    <div className="flex items-center gap-2 font-bold text-rose-400">
-                      <Newspaper className="h-4 w-4" />
-                      <span>Mídia de Notícias RSS em Tela Inteira</span>
-                    </div>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">
-                      Carrega as manchetes em tempo real com imagem e título oficiais direto do feed RSS em <strong>tela inteira</strong>. O player rotaciona as notícias com barra de tempo elegante.
-                    </p>
-                  </div>
-
                   {rssList.length > 0 && (
                     <div>
                       <label className="block font-semibold text-slate-300 mb-1.5">
-                        Usar um Feed RSS já cadastrado:
+                        Feeds cadastrados:
                       </label>
                       <div className="flex flex-wrap gap-1.5">
                         {rssList.map((r) => (
@@ -4639,26 +3643,18 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       required
                       value={mediaForm.file_url}
                       onChange={(e) => setMediaForm({ ...mediaForm, file_url: e.target.value })}
-                      placeholder="https://g1.globo.com/rss/g1/saude/ ou https://g1.globo.com/rss/g1/brasil/"
+                      placeholder="https://g1.globo.com/rss/g1/brasil/"
                       className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:border-rose-500"
                     />
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      O player busca automaticamente os títulos e as imagens ligadas a cada notícia.
-                    </p>
                   </div>
                 </div>
               )}
 
               {/* 4. WIDGET CLIMA & HORA */}
               {mediaSourceType === 'weather_clock' && (
-                <div className="rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 text-xs text-blue-200 space-y-1.5">
-                  <div className="flex items-center gap-2 font-bold text-blue-400">
-                    <CloudSun className="h-4 w-4" />
-                    <span>Mídia Integrada de Hora Certa & Previsão do Tempo</span>
-                  </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
-                    Exibe a <strong>hora em tempo real na parte superior</strong> e a <strong>temperatura atual com previsão estendida na parte inferior</strong> durante a rotação da playlist.
-                  </p>
+                <div className="rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 text-xs text-blue-200 flex items-center gap-2 font-bold">
+                  <CloudSun className="h-4 w-4 text-blue-400" />
+                  <span>Clima & Hora Certa</span>
                 </div>
               )}
 
@@ -4971,7 +3967,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
             {/* Mobile Drag Indicator */}
             <div className="sm:hidden w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-3 shrink-0" />
 
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-white">{resetPasswordData.title}</h3>
               <button
                 type="button"
@@ -4981,9 +3977,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
-              Informe a nova senha temporária para o acesso.
-            </p>
             <form onSubmit={handlePerformPasswordReset} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-slate-300 mb-1">Nova Senha</label>
@@ -5045,21 +4038,10 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
-              {/* Explication banner */}
-              <div className="rounded-xl border border-blue-800/60 bg-blue-950/40 p-3.5 space-y-2">
-                <div className="flex items-center gap-2 text-blue-300 font-semibold text-xs">
-                  <Sparkles className="h-4 w-4 text-blue-400 shrink-0" />
-                  <span>Acesso Instantâneo Sem Login</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed text-[11px]">
-                  Ao abrir este link em qualquer aparelho (Smart TV, TV Box, Mini PC ou Monitor), o reprodutor carrega e inicia a exibição imediatamente sem pedir código, login ou senha.
-                </p>
-              </div>
-
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
               {/* Link Input & Copy */}
               <div className="space-y-1.5">
-                <label className="block font-semibold text-slate-300">URL Direta do Player com Token Seguro</label>
+                <label className="block font-semibold text-slate-300">URL Direta do Player</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -5091,38 +4073,18 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
               </div>
 
-              {/* How to use on TV */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2.5">
-                <h4 className="font-bold text-white text-xs uppercase tracking-wider">Como instalar no aparelho/TV:</h4>
-                <ol className="space-y-2 text-slate-300 text-[11px] list-decimal list-inside leading-relaxed">
-                  <li>
-                    <strong className="text-white">Copie o link único</strong> acima usando o botão azul.
-                  </li>
-                  <li>
-                    <strong className="text-white">Abra o navegador</strong> da sua Smart TV, TV Box, Raspberry Pi ou aparelho de exibição.
-                  </li>
-                  <li>
-                    <strong className="text-white">Cole e acesse o link</strong>. O reprodutor entrará direto exibindo a playlist de vídeos/fotos, notícias RSS e clima.
-                  </li>
-                  <li>
-                    <strong className="text-white">Crie um atalho</strong> na tela inicial da TV ou salve nos Favoritos para inicialização automática ao ligar o aparelho.
-                  </li>
-                </ol>
-              </div>
-
               {/* Security & Token reset */}
               <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3.5 flex items-center justify-between gap-3">
                 <div>
-                  <span className="text-xs font-semibold text-slate-300 block">Token de Segurança Único</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Token de Acesso</span>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    {playerDirectLinkModal.player.access_token || 'Token ativo'}
+                    {playerDirectLinkModal.player.access_token || 'Ativo'}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRegenerateToken(playerDirectLinkModal.player!)}
                   className="min-h-[36px] px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer shrink-0"
-                  title="Gerar novo token invalida os atalhos antigos"
                 >
                   Regenerar Token
                 </button>
@@ -5163,7 +4125,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Escolher Notícias RSS</h3>
-                  <p className="text-xs text-slate-400">Selecione o canal para exibir em tela cheia na playlist</p>
                 </div>
               </div>
               <button
@@ -5191,7 +4152,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                           {preset.category}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{preset.description}</p>
                     </div>
                     <button
                       type="button"
@@ -5259,7 +4219,6 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white">Adicionar à Playlist</h3>
-                  <p className="text-xs text-slate-400">Escolha em qual playlist incluir o conteúdo</p>
                 </div>
               </div>
               <button

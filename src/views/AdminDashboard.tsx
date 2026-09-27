@@ -314,8 +314,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         api.getFirestoreStatus().catch(() => null),
       ]);
       setStats(s);
-      setCompanies(c);
-      setPlans(p);
+      setCompanies(Array.isArray(c) ? c : []);
+      setPlans(Array.isArray(p) ? p : []);
       if (fsStatus) setFirestoreStatus(fsStatus);
     } catch (err: any) {
       showToast('error', err.message || 'Erro ao carregar dados do painel.');
@@ -340,9 +340,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isImportingBackup, setIsImportingBackup] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExportBackup = () => {
-    api.exportBackup();
-    showToast('success', 'Download do arquivo de backup JSON iniciado!');
+  const handleExportBackup = async () => {
+    try {
+      await api.exportBackup();
+      showToast('success', 'Download do arquivo de backup JSON iniciado!');
+    } catch (err: any) {
+      showToast('error', err.message || 'Falha ao exportar arquivo de backup.');
+    }
   };
 
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -674,8 +678,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Subheader / Tabs com scroll horizontal suave em telas pequenas */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-5 mb-6 sm:mb-8">
         <div>
-          <h2 className="text-xl sm:text-3xl font-light text-white tracking-tight">Visão Geral Administrativa</h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">Acompanhamento central de empresas, planos e operações globais</p>
+          <h2 className="text-xl sm:text-3xl font-light text-white tracking-tight">Administração</h2>
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1 sm:pb-0">
@@ -773,10 +776,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <CheckCircle className="h-5 w-5 text-emerald-400" />
               </div>
               <p className="mt-3 text-4xl font-light text-white">{stats.activeCompanies}</p>
-              <div className="mt-4 flex items-center text-xs text-emerald-400 font-medium gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                <span>Empresas em operação regular</span>
-              </div>
             </div>
 
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
@@ -787,10 +786,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <XCircle className="h-5 w-5 text-rose-400" />
               </div>
               <p className="mt-3 text-4xl font-light text-white">{stats.inactiveCompanies}</p>
-              <div className="mt-4 flex items-center text-xs text-rose-400/80 font-medium gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                <span>Acesso suspenso ou bloqueado</span>
-              </div>
             </div>
 
             <div className="rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-sm">
@@ -801,96 +796,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Monitor className="h-5 w-5 text-blue-400" />
               </div>
               <p className="mt-3 text-4xl font-light text-white">{stats.totalPlayers}</p>
-              <div className="mt-4 flex items-center text-xs text-blue-400 font-medium gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span>Dispositivos conectados na rede</span>
-              </div>
-            </div>
-          </div>
-
-          {/* APRESENTAÇÃO COMERCIAL & PROPOSTA PDF (KIT DE VENDAS DO DEV/ADMIN) */}
-          <div className="rounded-xl border border-indigo-900/60 bg-gradient-to-br from-slate-800/95 via-indigo-950/30 to-slate-800/95 p-6 shadow-lg">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3.5">
-                <div className="p-3 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shrink-0">
-                  <FileSpreadsheet className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-white">
-                      Apresentação Comercial Executiva (Kit de Vendas em PDF)
-                    </h3>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-900/60 border border-indigo-700/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
-                      <Sparkles className="h-3 w-3 text-indigo-400" />
-                      Pronto para Apresentar
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                    Material comercial com 7 slides em alta resolução: dores do cliente, comparação com painéis antigos de LED, arquitetura em nuvem, planos SHOW vs. CALL (com proporção 4:1 de operadores), diferenciais de voz natural e requisitos simples de instalação.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 shrink-0">
-                {onOpenPresentation && (
-                  <button
-                    type="button"
-                    onClick={onOpenPresentation}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition shadow-md cursor-pointer hover:shadow-blue-500/20"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>Abrir Apresentação & Baixar PDF</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Mini preview dos tópicos da apresentação */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-700/70">
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                <span className="text-[10px] font-bold uppercase text-indigo-400">Slide 1-2</span>
-                <p className="font-semibold text-white mt-0.5">Dores & Capa</p>
-                <p className="text-[11px] text-slate-400">Fim de esperas cansativas e TVs desatualizadas</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                <span className="text-[10px] font-bold uppercase text-indigo-400">Slide 3-4</span>
-                <p className="font-semibold text-white mt-0.5">Operação & Planos</p>
-                <p className="text-[11px] text-slate-400">Plano SHOW (Mídia) vs CALL (Voz + Senhas)</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-indigo-400/20 text-xs">
-                <span className="text-[10px] font-bold uppercase text-emerald-400">Slide 5-6</span>
-                <p className="font-semibold text-white mt-0.5">Diferenciais Técnicos</p>
-                <p className="text-[11px] text-slate-400">Voz natural sem gravações e setup em 15min</p>
-              </div>
-              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
-                <span className="text-[10px] font-bold uppercase text-amber-400">Slide 7</span>
-                <p className="font-semibold text-white mt-0.5">Fechamento & Proposta</p>
-                <p className="text-[11px] text-slate-400">Personalizado com os dados do cliente</p>
-              </div>
             </div>
           </div>
 
           {/* Acessos Rápidos do Sistema (Exclusivo Admin Geral) */}
           <div className="rounded-xl border border-blue-900/50 bg-slate-800/95 p-6 shadow-md">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-700/80 pb-5 mb-6">
-              <div className="flex items-start sm:items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0 mt-1 sm:mt-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0">
                   <Shield className="h-5 w-5" />
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                      Acessos Rápidos do Sistema
-                    </h3>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-900/60 border border-blue-700/60 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                      <Sparkles className="h-3 w-3 text-blue-400" />
-                      Privativo do Admin Geral
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Carregue dados de teste a qualquer momento para demonstração e alterne entre perfis com um clique.
-                  </p>
-                </div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                  Acessos Rápidos
+                </h3>
               </div>
 
               {/* Botão Principal: Carregar Dados de Teste */}
@@ -901,12 +819,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onClick={handleSeedDemoData}
                   disabled={isSeeding}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-950/40 border border-emerald-400/40 disabled:opacity-50"
-                  title="Restaura empresas, operadores, telas e mídias de demonstração para apresentação comercial"
                 >
                   {isSeeding ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-white" />
-                      <span>Carregando Dados de Teste...</span>
+                      <span>Carregando...</span>
                     </>
                   ) : (
                     <>
@@ -924,22 +841,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-2 rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30 shrink-0">
                   <Database className="h-4 w-4" />
                 </div>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-white">Banco de Dados: Firebase Firestore</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                      Persistência Cloud Ativa
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Todos os cadastros e dados são salvos no Firebase e protegidos contra perdas em deploys no Render.
-                    {firestoreStatus?.lastSyncTimestamp && (
-                      <span className="ml-1.5 text-slate-500">
-                        (Última sincronização: {new Date(firestoreStatus.lastSyncTimestamp).toLocaleTimeString()})
-                      </span>
-                    )}
-                  </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-white">Firebase Firestore</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                    Ativo
+                  </span>
                 </div>
               </div>
 
@@ -1053,9 +960,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <Shield className="h-5 w-5 text-purple-400" />
                   </div>
                   <h4 className="text-sm font-bold text-white uppercase tracking-wider">1. Admin Geral</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Painel mestre para administração global de clientes, planos e cotas.
-                  </p>
 
                   <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                     <div className="flex items-center justify-between text-slate-300">
@@ -1092,9 +996,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Building2 className="h-5 w-5 text-blue-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Drogarias SP</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Farmácia • Gestão de mídias, playlists, telas e chamadas com voz.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1137,9 +1038,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Building2 className="h-5 w-5 text-blue-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">2. Supermercado Central</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Varejo Hortifruti • Gestão de ofertas, caixas rápidos e telas.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1185,9 +1083,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Radio className="h-5 w-5 text-emerald-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operador (Carlos)</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Balcão 01 • Chamada por voz na TV, fila preferencial e avisos.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1230,9 +1125,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Radio className="h-5 w-5 text-emerald-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">3. Operadora (Ana)</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Caixa Rápido 01 • Chamada rápida no painel e som ding-dong.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1278,9 +1170,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Tv className="h-5 w-5 text-amber-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. TV Recepção</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Drogaria SP • Notícias G1, hora, clima em tempo real e voz de chamada.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1329,9 +1218,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <Tv className="h-5 w-5 text-amber-400" />
                     </div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">4. TV Salão Vendas</h4>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Supermercado • Ofertas de hortifruti, clima, relógio e avisos de caixa.
-                    </p>
 
                     <div className="mt-4 p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-1 text-xs font-mono">
                       <div className="flex items-center justify-between text-slate-300">
@@ -1372,14 +1258,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Aviso explicativo para o apresentador */}
-            <div className="mt-4 p-3 rounded-lg bg-slate-900/50 border border-slate-800 flex items-center gap-2 text-xs text-slate-400">
-              <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
-              <span>
-                <strong>Dica para apresentações:</strong> Caso alguma empresa ou tela tenha sido excluída em testes anteriores, basta clicar em <strong>&ldquo;Carregar Dados de Teste&rdquo;</strong> acima para reconstruir instantaneamente os 2 clientes com todas as mídias, operadores e telas de TV.
-              </span>
-            </div>
           </div>
 
           {/* Atalhos Rápidos */}
@@ -1395,7 +1273,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-white">Gerenciar Empresas</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Cadastrar, editar e monitorar planos</p>
                 </div>
               </button>
 
@@ -1408,7 +1285,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-white">Gerenciar Planos</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">Definir cotas e limites operacionais</p>
                 </div>
               </button>
 
@@ -1421,7 +1297,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wider text-rose-200">Encerrar Sessão</h4>
-                  <p className="text-xs text-rose-400/80 mt-0.5">Sair com segurança do sistema</p>
                 </div>
               </button>
             </div>
@@ -1435,8 +1310,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Header e Ações */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Empresas Contratantes</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Gerenciamento cadastral, limites operacionais e assinaturas</p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Empresas</h3>
             </div>
             <button
               id="btn-nova-empresa"
@@ -1785,10 +1659,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Planos Comerciais</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Modelos padrão (Call 4:1 e Show) e Planos Especiais sob medida com quantidade livre de telas e operadores.
-              </p>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-white">Planos</h3>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -1852,7 +1723,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {p.active ? 'Ativo' : 'Inativo'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mb-5 min-h-[32px]">{p.description}</p>
 
                     <div className="space-y-2.5 text-xs text-slate-300 border-t border-slate-700 pt-4">
                       <div className="flex justify-between items-center">
@@ -1950,9 +1820,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {editingCompany ? 'Atualize os dados cadastrais e limites do plano' : 'Preencha os dados cadastrais da nova empresa'}
-                </p>
               </div>
               <button
                 type="button"
@@ -2232,9 +2099,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Permite definir livremente a quantidade exata de telas, operadores e cota máxima de mídias para este cliente. Deixe em branco caso deseje usar os limites do plano selecionado.
-                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1">
@@ -2304,12 +2168,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         type="url"
                         value={companyForm.drive_folder_url || ''}
                         onChange={(e) => setCompanyForm({ ...companyForm, drive_folder_url: e.target.value })}
-                        placeholder="https://drive.google.com/drive/folders/... (Preenchido automaticamente ao conectar ou crie manualmente)"
+                        placeholder="https://drive.google.com/drive/folders/..."
                         className="w-full min-h-[40px] rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                       />
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Cada cliente possui isolamento total. O sistema cria automaticamente a pasta <strong className="text-slate-300">MÍDIA INDOOR / [Nome]</strong> ou você pode colar aqui o link de uma pasta existente.
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -2524,43 +2385,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span className="text-[10px] opacity-80">Livre / Sob Medida</span>
                     </button>
                   </div>
-
-                  {/* Banner explicativo contextual de cada modo */}
-                  {planMode === 'special' && (
-                    <div className="mt-2 rounded-lg border border-purple-800/80 bg-purple-950/40 p-2.5 flex items-start gap-2 text-purple-200">
-                      <Sparkles className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
-                      <div className="text-[11px] leading-tight">
-                        <strong className="block text-purple-300 font-semibold mb-0.5">Plano Especial Sob Medida (Trava 4:1 Liberada):</strong>
-                        Você tem total liberdade para definir qualquer número de telas e operadores (ex: 1 tela e 1 operador, 2 telas e 15 operadores, etc.).
-                      </div>
-                    </div>
-                  )}
-
-                  {planMode === 'call' && (
-                    <div className="mt-2 rounded-lg border border-blue-800/80 bg-blue-950/40 p-2.5 flex items-start justify-between gap-2 text-blue-200">
-                      <div className="text-[11px] leading-tight">
-                        <strong className="block text-blue-300 font-semibold mb-0.5">Padrão Linha Call:</strong>
-                        Calcula automaticamente 4 operadores de guichê por tela de chamada.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlanMode('special');
-                          setAutoCalcRatio(false);
-                        }}
-                        className="text-[10px] font-bold uppercase tracking-wider text-purple-400 hover:text-purple-300 underline shrink-0 cursor-pointer"
-                      >
-                        Destravar
-                      </button>
-                    </div>
-                  )}
-
-                  {planMode === 'show' && (
-                    <div className="mt-2 rounded-lg border border-amber-800/80 bg-amber-950/40 p-2.5 text-[11px] text-amber-200 leading-tight">
-                      <strong className="block text-amber-300 font-semibold mb-0.5">Padrão Linha Show:</strong>
-                      Exclusivo para exibição de mídias indoor, notícias RSS e clima (operadores fixados em 0).
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2729,9 +2553,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
-              Defina a nova senha temporária para o usuário administrador da empresa.
-            </p>
             <form onSubmit={handleResetPassword} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nova Senha Provisória</label>

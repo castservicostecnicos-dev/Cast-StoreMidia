@@ -240,17 +240,6 @@ export const RssNewsMedia: React.FC<RssNewsMediaProps> = ({
             {cleanRssText(currentArticle.description)}
           </p>
         )}
-
-        {/* FOOTER BAR INSIDE MEDIA */}
-        <div className="mt-6 sm:mt-8 pt-4 border-t border-white/15 flex items-center justify-between text-xs sm:text-sm text-slate-300">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>Atualizado via Feed RSS Oficial</span>
-          </div>
-          {playerName && (
-            <span className="hidden sm:inline text-slate-400 text-xs">Exibição: {playerName}</span>
-          )}
-        </div>
       </main>
 
       {/* DURATION PROGRESS BAR (discreet bar along the bottom) */}

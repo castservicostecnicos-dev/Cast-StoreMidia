@@ -526,6 +526,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
             const call = evt.data.call;
             const matches = !targetPlayerId || !call.player_id || call.player_id === targetPlayerId;
             if (matches) {
+              try {
+                bc?.postMessage({ type: 'CALL_ACK', callId: call.id });
+              } catch {}
               triggerCallOnScreen(call);
             }
           }
@@ -692,13 +695,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
         <div className="relative flex-1 w-full h-full overflow-hidden bg-black flex items-center justify-center">
           {items.length === 0 ? (
             <div className="text-center p-8 text-slate-500 max-w-md">
-              <p className="text-xl font-bold text-slate-400">Nenhuma mídia vinculada à playlist.</p>
-              <p className="text-xs mt-2 text-slate-500">
-                Acesse o painel da empresa para associar mídias a este player.
-              </p>
-              <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-400 font-mono">
-                <span>Modo: {isVertical ? 'Vertical 9:16 (1080×1920)' : 'Horizontal 16:9 (1920×1080)'}</span>
-              </div>
+              <p className="text-xl font-bold text-slate-400">Sem mídias na playlist</p>
             </div>
           ) : currentMedia?.type === 'weather_clock' ? (
             <WeatherClockMedia
@@ -859,7 +856,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           className="absolute top-4 left-4 z-40 flex items-center gap-2 rounded-lg bg-amber-600/90 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white shadow-2xl border border-amber-400/40 animate-pulse"
         >
           <WifiOff className="w-4 h-4 text-amber-100" />
-          <span>MODO OFFLINE — Reproduzindo via Cache Workbox ({items.length} mídias)</span>
+          <span>OFFLINE</span>
         </div>
       )}
 
@@ -928,13 +925,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onExit, overridePlayerCo
           type="button"
           onClick={() => {
             unlockAudio();
-            playCallAlert('Dirija-se ao caixa 1', false);
+            triggerCallOnScreen({
+              id: `test-call-${Date.now()}`,
+              phrase: 'Atenção, dirija-se ao atendimento no caixa 1',
+              duration: 7,
+              is_priority: false,
+            });
           }}
-          className="flex items-center gap-1.5 rounded-lg bg-slate-900/90 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 hover:text-white border border-slate-700/80 shadow-xl cursor-pointer backdrop-blur-sm"
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold border shadow-xl cursor-pointer backdrop-blur-sm transition ${
+            isSpeakingCall
+              ? 'bg-amber-950/90 text-amber-300 border-amber-500/80 animate-pulse'
+              : 'bg-slate-900/90 text-slate-200 hover:text-white border-slate-700/80'
+          }`}
           title="Testar sinal sonoro de chamada e voz sintetizada em português"
         >
-          <Volume2 className="h-3.5 w-3.5 text-blue-400" />
-          <span>Testar Som & Voz</span>
+          <Volume2 className={`h-3.5 w-3.5 ${isSpeakingCall ? 'text-amber-400' : 'text-blue-400'}`} />
+          <span>{isSpeakingCall ? 'Falando...' : 'Testar Som & Voz'}</span>
         </button>
 
         {/* Tela Cheia */}

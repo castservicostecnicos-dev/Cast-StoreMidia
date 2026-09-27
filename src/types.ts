@@ -60,6 +60,7 @@ export interface Player {
   user_id: string;
   name: string;
   code: string;
+  short_code?: string;
   location: string;
   description: string;
   orientation?: PlayerOrientation; // 'horizontal' (16:9 - 1920x1080) | 'vertical' (9:16 - 1080x1920)

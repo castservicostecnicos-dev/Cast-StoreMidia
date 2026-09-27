@@ -23,6 +23,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
 
   // Mandatory password change modal
   const [mustChangeUser, setMustChangeUser] = useState<User | null>(null);
+  const [pendingLoginData, setPendingLoginData] = useState<{
+    user: User;
+    company?: { id: string; name: string };
+    player?: Player;
+  } | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changeLoading, setChangeLoading] = useState(false);
@@ -40,6 +45,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
 
       if (res.user.must_change_password) {
         setMustChangeUser(res.user);
+        setPendingLoginData(res);
         setLoading(false);
         return;
       }
@@ -72,7 +78,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
       showToast('success', 'Senha redefinida com sucesso!');
       if (mustChangeUser) {
         const updatedUser = { ...mustChangeUser, must_change_password: false };
-        onLoginSuccess({ user: updatedUser });
+        onLoginSuccess({
+          ...(pendingLoginData || {}),
+          user: updatedUser,
+        });
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro ao alterar senha.');
@@ -105,7 +114,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-white uppercase sm:text-3xl">
             CAST <span className="text-blue-400">MÍDIA INDOOR</span>
           </h1>
-          <p className="mt-1 text-xs tracking-wider text-slate-400 uppercase">Sistema de Gestão e Reprodução de Mídia</p>
         </div>
 
         {/* Login Box */}
@@ -203,9 +211,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
                   />
                   <Monitor className="absolute right-3.5 top-3.5 h-5 w-5 text-slate-500" />
                 </div>
-                <p className="mt-1.5 text-xs text-slate-400">
-                  Insira o código único cadastrado no painel da empresa para iniciar a reprodução.
-                </p>
               </div>
             )}
 
@@ -240,8 +245,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Primeiro Acesso: Alteração de Senha</h3>
-                <p className="text-xs text-slate-400">Por segurança, é obrigatório definir uma nova senha pessoal.</p>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">Alteração de Senha</h3>
               </div>
             </div>
 
@@ -301,10 +305,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, showToast 
             {/* Mobile Drag Indicator */}
             <div className="sm:hidden w-12 h-1.5 bg-slate-600 rounded-full mx-auto mb-3 shrink-0" />
 
-            <h3 className="text-sm font-bold uppercase tracking-wider text-white border-b border-slate-700 pb-3 mb-2">Recuperar Senha</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Informe seu e-mail cadastrado para receber as orientações de redefinição de acesso.
-            </p>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white border-b border-slate-700 pb-3 mb-4">Recuperar Senha</h3>
 
             {forgotSuccess ? (
               <div className="space-y-4">

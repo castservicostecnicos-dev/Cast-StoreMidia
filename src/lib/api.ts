@@ -23,6 +23,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const token = getStoredToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    Accept: 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
@@ -35,13 +36,32 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  const data = await response.json().catch(() => ({}));
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  let data: any = null;
+  let parseFailed = false;
+
+  try {
+    data = await response.json();
+  } catch {
+    parseFailed = true;
+    data = {};
+  }
 
   if (!response.ok) {
-    throw new Error(data.error || 'Ocorreu um erro ao processar a requisição.');
+    throw new Error(data?.error || 'Ocorreu um erro ao processar a requisição.');
+  }
+
+  if (parseFailed || contentType.includes('text/html')) {
+    throw new Error('Resposta inválida do servidor.');
   }
 
   return data as T;
+}
+
+function ensureArray<T>(val: any, fallbackKey?: string): T[] {
+  if (Array.isArray(val)) return val;
+  if (fallbackKey && val && Array.isArray(val[fallbackKey])) return val[fallbackKey];
+  return [];
 }
 
 export const api = {
@@ -88,15 +108,32 @@ export const api = {
         isSyncing: boolean;
       };
     }>('/admin/firestore/sync', { method: 'POST' }),
-  exportBackup: () => {
-    window.location.href = `${API_BASE_URL}/admin/backup/export`;
+  exportBackup: async () => {
+    const token = getStoredToken();
+    const res = await fetch(`${API_BASE_URL}/admin/backup/export`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      throw new Error('Falha ao exportar backup.');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `indoor_media_backup_${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
   },
   importBackup: (backup: any) =>
     request<{ success: boolean; message: string }>('/admin/backup/import', {
       method: 'POST',
       body: JSON.stringify({ backup }),
     }),
-  getCompanies: () => request<Company[]>('/admin/companies'),
+  getCompanies: () =>
+    request<Company[]>('/admin/companies').then((r) => ensureArray<Company>(r, 'companies')),
   createCompany: (data: Partial<Company> & { password?: string }) =>
     request<Company>('/admin/companies', { method: 'POST', body: JSON.stringify(data) }),
   updateCompany: (id: string, data: Partial<Company>) =>
@@ -113,7 +150,8 @@ export const api = {
   deleteCompany: (id: string) =>
     request<{ message: string }>(`/admin/companies/${id}`, { method: 'DELETE' }),
 
-  getPlans: () => request<Plan[]>('/admin/plans'),
+  getPlans: () =>
+    request<Plan[]>('/admin/plans').then((r) => ensureArray<Plan>(r, 'plans')),
   createPlan: (data: Partial<Plan>) =>
     request<Plan>('/admin/plans', { method: 'POST', body: JSON.stringify(data) }),
   updatePlan: (id: string, data: Partial<Plan>) =>
@@ -148,7 +186,8 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  getCompanyPlayers: () => request<Player[]>('/company/players'),
+  getCompanyPlayers: () =>
+    request<Player[]>('/company/players').then((r) => ensureArray<Player>(r, 'players')),
   createCompanyPlayer: (data: Partial<Player> & { password?: string }) =>
     request<Player>('/company/players', { method: 'POST', body: JSON.stringify(data) }),
   updateCompanyPlayer: (id: string, data: Partial<Player>) =>
@@ -169,7 +208,8 @@ export const api = {
       method: 'POST',
     }),
 
-  getCompanyOperators: () => request<Operator[]>('/company/operators'),
+  getCompanyOperators: () =>
+    request<Operator[]>('/company/operators').then((r) => ensureArray<Operator>(r, 'operators')),
   createCompanyOperator: (data: Partial<Operator> & { password?: string }) =>
     request<Operator>('/company/operators', { method: 'POST', body: JSON.stringify(data) }),
   updateCompanyOperator: (id: string, data: Partial<Operator>) =>
@@ -184,7 +224,8 @@ export const api = {
   deleteCompanyOperator: (id: string) =>
     request<{ message: string }>(`/company/operators/${id}`, { method: 'DELETE' }),
 
-  getCompanyPlaylists: () => request<Playlist[]>('/company/playlists'),
+  getCompanyPlaylists: () =>
+    request<Playlist[]>('/company/playlists').then((r) => ensureArray<Playlist>(r, 'playlists')),
   createCompanyPlaylist: (data: Partial<Playlist>) =>
     request<Playlist>('/company/playlists', { method: 'POST', body: JSON.stringify(data) }),
   updateCompanyPlaylist: (id: string, data: Partial<Playlist>) =>
@@ -204,7 +245,8 @@ export const api = {
       body: JSON.stringify(params),
     }),
 
-  getCompanyMedia: () => request<Media[]>('/company/media'),
+  getCompanyMedia: () =>
+    request<Media[]>('/company/media').then((r) => ensureArray<Media>(r, 'media')),
   checkMediaIntegrity: (driveAccessToken?: string) =>
     request<MediaIntegrityAuditReport>('/company/media/check-integrity', {
       method: 'POST',
@@ -230,8 +272,10 @@ export const api = {
   deleteCompanyMedia: (id: string) =>
     request<{ message: string }>(`/company/media/${id}`, { method: 'DELETE' }),
 
-  getCompanyRss: () => request<RssFeed[]>('/company/rss'),
-  getRssPresets: () => request<RssPreset[]>('/company/rss/presets'),
+  getCompanyRss: () =>
+    request<RssFeed[]>('/company/rss').then((r) => ensureArray<RssFeed>(r, 'feeds')),
+  getRssPresets: () =>
+    request<RssPreset[]>('/company/rss/presets').then((r) => ensureArray<RssPreset>(r, 'presets')),
   loadDefaultRssFeeds: () =>
     request<{ message: string; feeds: RssFeed[] }>('/company/rss/load-defaults', { method: 'POST' }),
   createCompanyRss: (data: Partial<RssFeed>) =>
@@ -266,8 +310,13 @@ export const api = {
       expected_interval_seconds?: number;
       heartbeat_timeout_seconds?: number;
       server_time?: string;
-    }>('/operator/dashboard'),
-  getOperatorPhrases: () => request<CallPhrase[]>('/operator/phrases'),
+    }>('/operator/dashboard').then((res) => ({
+      ...res,
+      players: ensureArray(res?.players),
+      phrases: ensureArray(res?.phrases),
+    })),
+  getOperatorPhrases: () =>
+    request<CallPhrase[]>('/operator/phrases').then((r) => ensureArray<CallPhrase>(r, 'phrases')),
   createOperatorPhrase: (phrase: string) =>
     request<CallPhrase>('/operator/phrases', { method: 'POST', body: JSON.stringify({ phrase }) }),
   updateOperatorPhrase: (id: string, data: { phrase?: string; active?: boolean }) =>

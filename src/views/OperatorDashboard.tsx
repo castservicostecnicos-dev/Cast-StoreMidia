@@ -16,9 +16,10 @@ import {
   ExternalLink,
   Keyboard,
   Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { playCallAlert, unlockAudio } from '../lib/audio';
+import { playCallAlert, stopCallAlert, unlockAudio, preloadPhraseAudio } from '../lib/audio';
 import { PlayerDiagnosticView, DiagnosticPlayerData } from '../components/PlayerDiagnosticView';
 
 interface OperatorDashboardProps {
@@ -63,6 +64,13 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
   const [duration, setDuration] = useState<number>(10);
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState<boolean>(false);
+  const [playLocalSound, setPlayLocalSound] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('indoor_op_local_sound') !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [lastCallDelivered, setLastCallDelivered] = useState<boolean | null>(null);
   const [lastCallTime, setLastCallTime] = useState<string | null>(null);
 
@@ -78,14 +86,25 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     } catch {}
   }, [callText, selectedPlayerId]);
 
+  // Pre-fetch TTS voice audio buffer in background whenever phrase changes
+  useEffect(() => {
+    const trimmed = callText.trim();
+    if (!trimmed) return;
+    const timer = setTimeout(() => {
+      preloadPhraseAudio(trimmed).catch(() => {});
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [callText]);
+
   const loadData = async () => {
     try {
       const res = await api.getOperatorDashboard();
-      setPlayers(res.players);
-      if (res.players.length > 0) {
+      const playerList = Array.isArray(res?.players) ? res.players : [];
+      setPlayers(playerList);
+      if (playerList.length > 0) {
         setSelectedPlayerId((prev) => {
-          const match = res.players.find((p) => p.id === prev);
-          const validId = match ? match.id : res.players[0].id;
+          const match = playerList.find((p) => p.id === prev);
+          const validId = match ? match.id : playerList[0].id;
           try {
             localStorage.setItem('indoor_op_player_id', validId);
           } catch {}
@@ -103,11 +122,12 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     const interval = setInterval(() => {
       api.getOperatorDashboard()
         .then((res) => {
-          setPlayers(res.players);
-          if (res.players.length > 0) {
+          const playerList = Array.isArray(res?.players) ? res.players : [];
+          setPlayers(playerList);
+          if (playerList.length > 0) {
             setSelectedPlayerId((prev) => {
-              const match = res.players.find((p) => p.id === prev);
-              return match ? match.id : res.players[0].id;
+              const match = playerList.find((p) => p.id === prev);
+              return match ? match.id : playerList[0].id;
             });
           }
         })
@@ -129,6 +149,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     }
 
     const priorityToSend = overridePriority !== undefined ? overridePriority : isPriority;
+    unlockAudio();
     setIsCalling(true);
     try {
       const res = await api.triggerCall({
@@ -139,11 +160,21 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
       });
 
       // Synchronize immediately with all open tabs and windows in the browser
+      let playerTabHandledAudio = false;
       try {
         if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
           const bc = new BroadcastChannel('indoor_media_calls');
+          bc.onmessage = (evt) => {
+            if (evt.data?.type === 'CALL_ACK' && evt.data?.callId === res.call?.id) {
+              playerTabHandledAudio = true;
+            }
+          };
           bc.postMessage({ type: 'CALL_EVENT', call: res.call });
-          bc.close();
+          setTimeout(() => {
+            try {
+              bc.close();
+            } catch {}
+          }, 250);
         }
       } catch {}
 
@@ -153,6 +184,18 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
           JSON.stringify({ call: res.call, timestamp: Date.now() })
         );
       } catch {}
+
+      // Play chime + speech locally if enabled and no local PlayerView tab already took over audio
+      if (playLocalSound) {
+        setTimeout(() => {
+          if (!playerTabHandledAudio) {
+            setIsPreviewingVoice(true);
+            playCallAlert(callText.trim(), priorityToSend, {
+              onSpeechEnd: () => setIsPreviewingVoice(false),
+            });
+          }
+        }, 90);
+      }
 
       setLastCallDelivered(res.delivered);
       const nowStr = new Date().toLocaleTimeString('pt-BR', {
@@ -165,8 +208,8 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
       showToast(
         'success',
         priorityToSend
-          ? 'Chamada PREFERENCIAL enviada com sucesso! A frase continua fixa no campo.'
-          : res.message || 'Chamada enviada com sucesso! A frase continua fixa no campo.'
+          ? 'Chamada preferencial enviada.'
+          : res.message || 'Chamada enviada.'
       );
     } catch (err: any) {
       showToast('error', err.message || 'Falha ao enviar chamada.');
@@ -452,10 +495,15 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
                   <span>2. Frase de Chamada</span>
                 </label>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
+                      if (isPreviewingVoice) {
+                        stopCallAlert();
+                        setIsPreviewingVoice(false);
+                        return;
+                      }
                       if (!callText.trim()) {
                         showToast('info', 'Digite uma frase para ouvir o teste de voz.');
                         return;
@@ -474,7 +522,39 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
                     title="Ouvir como o sinal sonoro e a voz sintetizada em português soarão na tela da TV"
                   >
                     <Volume2 className={`h-3.5 w-3.5 ${isPreviewingVoice ? 'text-amber-400' : 'text-blue-400'}`} />
-                    <span>{isPreviewingVoice ? 'Ouvindo...' : 'Ouvir Voz'}</span>
+                    <span>{isPreviewingVoice ? 'Falando... (Parar)' : 'Ouvir Voz'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !playLocalSound;
+                      setPlayLocalSound(next);
+                      try {
+                        localStorage.setItem('indoor_op_local_sound', String(next));
+                      } catch {}
+                      if (next) {
+                        unlockAudio();
+                        showToast('info', 'Som ativado neste dispositivo ao disparar chamadas.');
+                      } else {
+                        stopCallAlert();
+                        setIsPreviewingVoice(false);
+                        showToast('info', 'Som silenciado neste dispositivo (tocará apenas na TV).');
+                      }
+                    }}
+                    className={`text-[11px] font-semibold px-2 py-1 rounded-lg border transition flex items-center gap-1 cursor-pointer ${
+                      playLocalSound
+                        ? 'bg-emerald-950/70 border-emerald-700/80 text-emerald-300 hover:bg-emerald-900/60'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Ativar ou silenciar a reprodução da voz e sinal sonoro neste computador/celular ao clicar em Chamar"
+                  >
+                    {playLocalSound ? (
+                      <Volume2 className="h-3 w-3 text-emerald-400" />
+                    ) : (
+                      <VolumeX className="h-3 w-3 text-slate-400" />
+                    )}
+                    <span>{playLocalSound ? 'Som Ativo' : 'Mudo'}</span>
                   </button>
 
                   <span className="inline-flex items-center gap-1 rounded-md bg-blue-950/90 border border-blue-700/80 px-2 py-0.5 text-[11px] font-bold text-blue-300">
@@ -511,24 +591,9 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
                     handleTriggerCall(false);
                   }
                 }}
-                placeholder="Digite aqui a frase da chamada (Ex: Favor comparecer ao consultório 02 / Senha P01)..."
+                placeholder="Frase da chamada..."
                 className="w-full rounded-xl border border-slate-700 bg-slate-900 p-3.5 text-sm font-medium text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition shadow-inner"
               />
-
-              <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">
-                <p className="flex items-center gap-1 text-slate-300 font-medium">
-                  <Pin className="h-3 w-3 text-blue-400 shrink-0" />
-                  Esta frase fica gravada e pronta para novas chamadas.
-                </p>
-                <div className="flex items-center gap-3">
-                  <span className="hidden sm:inline text-slate-500 text-[10px]">
-                    Atalho: <strong>Ctrl + Enter</strong> para chamar
-                  </span>
-                  <span className="text-slate-500 font-mono text-[10px]">
-                    {callText.length} caracteres
-                  </span>
-                </div>
-              </div>
             </div>
 
             {/* Fila / Atendimento Preferencial */}
@@ -539,23 +604,18 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
                   : 'border-amber-900/40 bg-amber-950/15'
               }`}
             >
-              <div className="flex items-start gap-2.5">
-                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5 sm:mt-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0">
                   <Star className="h-4 w-4 fill-amber-400" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wide flex items-center gap-1.5">
-                    <span>Fila Preferencial</span>
-                    {isPriority && (
-                      <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
-                        Ativa
-                      </span>
-                    )}
-                  </h4>
-                  <p className="text-[11px] text-amber-300/80">
-                    Exibe alerta dourado de Atendimento Prioritário na tela da TV
-                  </p>
-                </div>
+                <h4 className="text-xs font-bold text-amber-200 uppercase tracking-wide flex items-center gap-1.5">
+                  <span>Fila Preferencial</span>
+                  {isPriority && (
+                    <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                      Ativa
+                    </span>
+                  )}
+                </h4>
               </div>
 
               <div className="flex items-center gap-2">
@@ -601,26 +661,6 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
 
           {/* 3. BOTÕES DE DISPARO RÁPIDO */}
           <div className="space-y-3">
-            {/* Dica visual dos atalhos rápidos de teclado */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400 shadow-inner">
-              <div className="flex items-center gap-2">
-                <Keyboard className="h-4 w-4 text-blue-400 shrink-0" />
-                <span className="font-semibold text-slate-300">
-                  Atalhos de Teclado (fora da caixa de texto):
-                </span>
-              </div>
-              <div className="flex items-center gap-2 font-mono text-[11px]">
-                <span className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-md text-blue-300">
-                  <kbd className="font-bold text-white bg-slate-900 px-1 py-0.2 rounded border border-slate-600">N</kbd>
-                  <span>Chamar Normal</span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-md text-amber-300">
-                  <kbd className="font-bold text-white bg-slate-900 px-1 py-0.2 rounded border border-slate-600">P</kbd>
-                  <span>Chamar Preferencial</span>
-                </span>
-              </div>
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Botão Chamar Normal */}
               <button
@@ -666,7 +706,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
               <div className="mt-2 text-center text-xs font-medium text-emerald-400 flex items-center justify-center gap-2 bg-emerald-950/30 border border-emerald-900/50 py-2.5 px-4 rounded-xl">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>
-                  Chamada transmitida com sucesso para o player {selectedPlayer ? `(${selectedPlayer.name})` : ''} às {lastCallTime}. A frase continua salva para as próximas chamadas.
+                  Chamada enviada {selectedPlayer ? `(${selectedPlayer.name})` : ''} às {lastCallTime}
                 </span>
               </div>
             )}
@@ -699,29 +739,8 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
             </div>
           </div>
 
-          {/* Banner de Atenção se houver telas Offline */}
-          {offlinePlayersCount > 0 && (
-            <div className="rounded-xl border border-rose-800/80 bg-rose-950/40 p-4 text-rose-200">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wide">
-                    {offlinePlayersCount} {offlinePlayersCount === 1 ? 'Player Desconectado' : 'Players Desconectados'}
-                  </h4>
-                  <p className="text-xs text-rose-300/90 mt-1 leading-relaxed">
-                    Telas que não enviarem sinal de batimento (heartbeat) por mais de 45 segundos são marcadas como offline. Verifique conexão Wi-Fi, energia da Smart TV/TV Box ou acesse a simulação.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Seletor de Player para Diagnóstico Detalhado */}
           <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 shadow-sm">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block mb-3">
-              Selecione o Player para Inspecionar Conexão e Batimentos:
-            </label>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {players.map((p) => {
                 const isSelected = p.id === activeDiagnosticPlayer?.id;
