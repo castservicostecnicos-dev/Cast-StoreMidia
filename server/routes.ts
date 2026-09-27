@@ -1297,6 +1297,21 @@ apiRouter.delete('/company/operators/:id', requireAuth, requireRole('company'), 
 });
 
 // Playlists Management
+function enrichPlaylistWithMedia(playlist: Playlist, mediaList: Media[]): Playlist {
+  return {
+    ...playlist,
+    items: (playlist.items || []).map((it) => {
+      const media = mediaList.find((m) => m.id === it.media_id);
+      return {
+        ...it,
+        name: media?.name || it.name || 'Mídia',
+        type: media?.type || it.type || 'image',
+        file_url: media?.file_url || it.file_url || '',
+      };
+    }),
+  };
+}
+
 apiRouter.get('/company/playlists', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
   const companyId = req.user!.company_id!;
   const data = db.getData();
@@ -1304,7 +1319,9 @@ apiRouter.get('/company/playlists', requireAuth, requireRole('company'), (req: A
   if (injected) {
     db.persist();
   }
-  const playlists = data.playlists.filter((p) => p.company_id === companyId);
+  const playlists = data.playlists
+    .filter((p) => p.company_id === companyId)
+    .map((p) => enrichPlaylistWithMedia(p, data.media));
   res.json(playlists);
 });
 
@@ -1320,14 +1337,20 @@ apiRouter.post('/company/playlists', requireAuth, requireRole('company'), (req: 
   const now = new Date().toISOString();
   const playlistId = `pl-${Date.now()}`;
 
-  const formattedItems = (items || []).map((it: any, index: number) => ({
-    id: `pli-${Date.now()}-${index}`,
-    playlist_id: playlistId,
-    media_id: it.media_id,
-    position: index + 1,
-    duration: Number(it.duration) || 10,
-    created_at: now,
-  }));
+  const formattedItems = (items || []).map((it: any, index: number) => {
+    const media = data.media.find((m) => m.id === it.media_id);
+    return {
+      id: `pli-${Date.now()}-${index}`,
+      playlist_id: playlistId,
+      media_id: it.media_id,
+      position: index + 1,
+      duration: Number(it.duration) || 10,
+      name: media?.name || it.name,
+      type: media?.type || it.type,
+      file_url: media?.file_url || it.file_url,
+      created_at: now,
+    };
+  });
 
   const newPlaylist: Playlist = {
     id: playlistId,
@@ -1344,7 +1367,7 @@ apiRouter.post('/company/playlists', requireAuth, requireRole('company'), (req: 
   data.playlists.push(newPlaylist);
   db.persist();
 
-  res.status(201).json(newPlaylist);
+  res.status(201).json(enrichPlaylistWithMedia(newPlaylist, data.media));
 });
 
 apiRouter.put('/company/playlists/:id', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {
@@ -1364,19 +1387,25 @@ apiRouter.put('/company/playlists/:id', requireAuth, requireRole('company'), (re
 
   if (items && Array.isArray(items)) {
     const now = new Date().toISOString();
-    playlist.items = items.map((it: any, index: number) => ({
-      id: it.id || `pli-${Date.now()}-${index}`,
-      playlist_id: playlist.id,
-      media_id: it.media_id,
-      position: index + 1,
-      duration: Number(it.duration) || 10,
-      created_at: it.created_at || now,
-    }));
+    playlist.items = items.map((it: any, index: number) => {
+      const media = data.media.find((m) => m.id === it.media_id);
+      return {
+        id: it.id || `pli-${Date.now()}-${index}`,
+        playlist_id: playlist.id,
+        media_id: it.media_id,
+        position: index + 1,
+        duration: Number(it.duration) || 10,
+        name: media?.name || it.name,
+        type: media?.type || it.type,
+        file_url: media?.file_url || it.file_url,
+        created_at: it.created_at || now,
+      };
+    });
   }
   playlist.updated_at = new Date().toISOString();
 
   db.persist();
-  res.json(playlist);
+  res.json(enrichPlaylistWithMedia(playlist, data.media));
 });
 
 apiRouter.post('/company/playlists/:id/toggle-status', requireAuth, requireRole('company'), (req: AuthenticatedRequest, res) => {

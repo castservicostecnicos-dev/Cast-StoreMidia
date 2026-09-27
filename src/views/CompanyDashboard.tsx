@@ -519,10 +519,15 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         name: playlist.name,
         description: playlist.description || '',
         weather_city: playlist.weather_city || '',
-        items: playlist.items.map((it) => ({
-          media_id: it.media_id,
-          duration: it.duration || 10,
-        })),
+        items: playlist.items.map((it) => {
+          const matchedMedia = mediaList.find((m) => m.id === it.media_id);
+          return {
+            media_id: it.media_id,
+            duration: it.duration || 10,
+            name: matchedMedia?.name || it.name,
+            type: matchedMedia?.type || it.type,
+          } as any;
+        }),
       });
     } else {
       setEditingPlaylist(null);
@@ -530,7 +535,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
         name: '',
         description: '',
         weather_city: '',
-        items: mediaList.slice(0, 2).map((m) => ({ media_id: m.id, duration: m.duration || 10 })),
+        items: mediaList.slice(0, 2).map((m) => ({
+          media_id: m.id,
+          duration: m.duration || 10,
+          name: m.name,
+          type: m.type,
+        } as any)),
       });
     }
     setPlaylistModalOpen(true);
@@ -1813,14 +1823,19 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                           {pl.active ? 'Ativa' : 'Inativa'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">{pl.description || 'Sem descrição'}</p>
+                      {pl.description && <p className="text-xs text-slate-400 mt-1">{pl.description}</p>}
                       <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-[11px] text-sky-300 bg-sky-950/70 border border-sky-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
                           🌤️ Cidade: {pl.weather_city || 'São Paulo'}
                         </span>
 
                         {/* Status Clima na grade */}
-                        {pl.items.some((it) => it.type === 'weather_clock' || it.name?.toLowerCase().includes('previsão') || it.name?.toLowerCase().includes('clima')) ? (
+                        {pl.items.some((it) => {
+                          const m = mediaList.find((med) => med.id === it.media_id);
+                          const t = m?.type || it.type;
+                          const n = (m?.name || it.name || '').toLowerCase();
+                          return t === 'weather_clock' || n.includes('previsão') || n.includes('clima');
+                        }) ? (
                           <span className="text-[11px] text-amber-300 bg-amber-950/70 border border-amber-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
                             🌤️ Clima & Hora Ativo
                           </span>
@@ -1836,7 +1851,12 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                         )}
 
                         {/* Status RSS na grade */}
-                        {pl.items.some((it) => it.type === 'rss' || it.name?.toLowerCase().includes('rss') || it.name?.toLowerCase().includes('notícia')) ? (
+                        {pl.items.some((it) => {
+                          const m = mediaList.find((med) => med.id === it.media_id);
+                          const t = m?.type || it.type;
+                          const n = (m?.name || it.name || '').toLowerCase();
+                          return t === 'rss' || n.includes('rss') || n.includes('notícia');
+                        }) ? (
                           <span className="text-[11px] text-rose-300 bg-rose-950/70 border border-rose-800/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1 font-medium">
                             📰 Notícias RSS Ativas
                           </span>
@@ -1889,24 +1909,52 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                       Sequência ({pl.items.length} itens):
                     </p>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1 text-xs">
-                      {pl.items.map((it, idx) => (
-                        <div
-                          key={it.id || idx}
-                          className="flex items-center justify-between rounded-lg bg-slate-900/70 border border-slate-700/60 px-3 py-2 text-slate-300"
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <span className="font-mono text-slate-500 font-bold">{idx + 1}.</span>
-                            <span className="truncate text-white font-medium">{it.name || 'Mídia'}</span>
-                            <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                              ({it.type === 'weather_clock' ? 'CLIMA & HORA' : it.type})
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 text-xs">
+                      {pl.items.map((it, idx) => {
+                        const matchedMedia = mediaList.find((m) => m.id === it.media_id);
+                        const itemName = matchedMedia?.name || it.name || 'Mídia sem nome';
+                        const itemType = matchedMedia?.type || it.type || 'image';
+                        const typeLabel =
+                          itemType === 'weather_clock'
+                            ? 'CLIMA & HORA'
+                            : itemType === 'rss'
+                            ? 'RSS / LINK'
+                            : itemType === 'video'
+                            ? 'VÍDEO'
+                            : 'IMAGEM';
+
+                        return (
+                          <div
+                            key={it.id || idx}
+                            onClick={() => matchedMedia && setPreviewModalMedia(matchedMedia)}
+                            className={`flex items-center justify-between gap-2 rounded-lg bg-slate-900/70 border border-slate-700/60 px-3 py-2 text-slate-300 ${
+                              matchedMedia ? 'hover:border-slate-600 cursor-pointer transition' : ''
+                            }`}
+                            title={itemName}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="font-mono text-slate-500 font-bold shrink-0">{idx + 1}.</span>
+                              <span className="truncate text-white font-semibold">{itemName}</span>
+                              <span
+                                className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                  itemType === 'weather_clock'
+                                    ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                                    : itemType === 'rss'
+                                    ? 'bg-rose-950/80 text-rose-300 border border-rose-800/60'
+                                    : itemType === 'video'
+                                    ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
+                                    : 'bg-slate-800 text-slate-300 border border-slate-700'
+                                }`}
+                              >
+                                {typeLabel}
+                              </span>
+                            </div>
+                            <span className="shrink-0 font-mono text-xs text-blue-400 font-bold">
+                              {it.duration}s
                             </span>
                           </div>
-                          <span className="shrink-0 font-mono text-xs text-blue-400 font-bold">
-                            {it.duration}s
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -2196,6 +2244,27 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                       <span className="text-slate-500">ID:</span> {m.unique_code}
                     </p>
                   )}
+
+                  {(() => {
+                    const memberPlaylists = playlists.filter((pl) =>
+                      pl.items.some((it) => it.media_id === m.id)
+                    );
+                    if (memberPlaylists.length === 0) return null;
+                    return (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {memberPlaylists.map((pl) => (
+                          <span
+                            key={pl.id}
+                            className="inline-flex items-center gap-1 rounded bg-emerald-950/80 border border-emerald-800/70 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 truncate max-w-full"
+                            title={`Presente na playlist: ${pl.name}`}
+                          >
+                            <Check className="h-2.5 w-2.5 text-emerald-400 shrink-0" />
+                            <span className="truncate">{pl.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   <div className="mt-2.5 flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/60">
                     <span className="flex items-center gap-1 font-medium">
@@ -2934,6 +3003,8 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                     ) : (
                       playlistForm.items.map((it, idx) => {
                         const media = mediaList.find((m) => m.id === it.media_id);
+                        const itemName = media?.name || (it as any).name || 'Mídia sem nome';
+                        const itemType = media?.type || (it as any).type || 'image';
                         return (
                           <div
                             key={idx}
@@ -2947,11 +3018,11 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                               className="h-10 w-12 sm:w-14 shrink-0 rounded-lg overflow-hidden bg-slate-950 flex items-center justify-center border border-slate-700 cursor-pointer group hover:border-blue-500 relative transition"
                               title="Clique para pré-visualizar esta mídia"
                             >
-                              {media?.type === 'weather_clock' ? (
+                              {itemType === 'weather_clock' ? (
                                 <CloudSun className="h-5 w-5 text-amber-400" />
-                              ) : media?.type === 'rss' ? (
+                              ) : itemType === 'rss' ? (
                                 <Newspaper className="h-5 w-5 text-rose-400" />
-                              ) : media?.type === 'video' ? (
+                              ) : itemType === 'video' && media?.file_url ? (
                                 <>
                                   <video
                                     src={media.file_url}
@@ -2967,7 +3038,7 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
                                 <>
                                   <img
                                     src={media.file_url}
-                                    alt={media.name}
+                                    alt={itemName}
                                     referrerPolicy="no-referrer"
                                     className="h-full w-full object-cover group-hover:scale-105 transition"
                                   />
@@ -2982,20 +3053,20 @@ export const CompanyDashboard: React.FC<CompanyDashboardProps> = ({
 
                             {/* Media Title and Type Badge */}
                             <div className="flex-1 min-w-0">
-                              <p className="text-white font-bold text-xs truncate">
-                                {media?.name || 'Mídia Desconhecida'}
+                              <p className="text-white font-bold text-xs truncate" title={itemName}>
+                                {itemName}
                               </p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                                  media?.type === 'rss'
+                                  itemType === 'rss'
                                     ? 'bg-rose-950/80 text-rose-300 border border-rose-800/60'
-                                    : media?.type === 'weather_clock'
+                                    : itemType === 'weather_clock'
                                     ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60'
-                                    : media?.type === 'video'
+                                    : itemType === 'video'
                                     ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
                                     : 'bg-slate-700 text-slate-300'
                                 }`}>
-                                  {media?.type === 'rss' ? 'Notícia RSS' : media?.type === 'weather_clock' ? 'Clima & Hora' : media?.type || 'Mídia'}
+                                  {itemType === 'rss' ? 'Notícia RSS / Link' : itemType === 'weather_clock' ? 'Clima & Hora' : itemType === 'video' ? 'Vídeo' : 'Imagem'}
                                 </span>
                               </div>
                             </div>
