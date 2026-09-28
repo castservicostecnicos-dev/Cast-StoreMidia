@@ -2479,6 +2479,9 @@ apiRouter.post('/operator/call', requireAuth, (req: AuthenticatedRequest, res) =
   };
 
   data.player_calls.push(newCall);
+  if (data.player_calls.length > 500) {
+    data.player_calls = data.player_calls.slice(-500);
+  }
   db.persist();
 
   // Instant real-time transmission via SSE

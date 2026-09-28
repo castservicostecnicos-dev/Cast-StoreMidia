@@ -182,9 +182,9 @@ class RealtimeHub {
     const wasOffline = Date.now() - previousLastSeen > 45000;
 
     player.last_seen = new Date().toISOString();
-    db.persist();
 
     if (wasOffline) {
+      db.persist();
       this.broadcastPlayerStatus(player.id, player.company_id, true);
     }
     return true;
