@@ -110,7 +110,8 @@ export const getDriveAuthFriendlyMessage = (error: any): string => {
     return 'A solicitação de login foi cancelada.';
   }
   if (code === 'auth/unauthorized-domain' || message.includes('unauthorized-domain')) {
-    return 'Domínio não autorizado no Firebase Authentication. Adicione este domínio nas configurações do Firebase.';
+    const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+    return `Domínio "${currentDomain}" não autorizado no Firebase Authentication. Adicione "${currentDomain}" em Authentication > Settings > Domínios autorizados no Console do Firebase.`;
   }
   if (code === 'auth/network-request-failed') {
     return 'Erro de rede ao conectar com o Google. Verifique sua conexão com a internet.';
