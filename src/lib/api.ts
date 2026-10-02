@@ -405,6 +405,35 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  syncDriveFoldersServer: (data?: { companyId?: string; clientDriveToken?: string }) =>
+    request<{
+      status: string;
+      syncedCount: number;
+      settings: any;
+      message: string;
+    }>('/drive/sync-folders', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  uploadDriveDocumentServer: (data: {
+    fileData: string;
+    filename: string;
+    mimeType: string;
+    company_id: string;
+    category: string;
+    title: string;
+    description?: string;
+    clientDriveToken?: string;
+  }) =>
+    request<{
+      status: string;
+      document: any;
+      unique_code: string;
+      message: string;
+    }>('/drive/upload', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   uploadCompanyMediaToDriveServer: (data: {
     fileData: string;
     filename: string;

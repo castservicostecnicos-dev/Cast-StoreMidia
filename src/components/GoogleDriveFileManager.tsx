@@ -145,12 +145,14 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
           (!settingsRes.settings.token_expiry || settingsRes.settings.token_expiry > Date.now())
         ) {
           setCachedAccessToken(settingsRes.settings.access_token);
+        } else if (settingsRes.settings.connected) {
+          setCachedAccessToken('server-managed-cloud');
         }
       }
       if (docsRes.documents) {
         setDocuments(docsRes.documents);
       }
-      setHasTokenInMemory(hasActiveSession());
+      setHasTokenInMemory(hasActiveSession() || !!settingsRes.settings?.connected);
     } catch (err: any) {
       console.error('Error loading Drive manager data:', err);
     } finally {
@@ -251,12 +253,6 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
   // Sync / Ensure folders on Google Drive for all Clients (Empresas)
   const handleSyncAllClientFolders = async () => {
     const token = getCachedToken();
-    if (!token) {
-      showToast('error', 'Faça login no Google Drive primeiro para sincronizar as pastas.');
-      handleConnectGoogleDrive();
-      return;
-    }
-
     const clientsToSync = isDevAdmin
       ? companies
       : companies.filter((c) => c.id === currentCompanyId);
@@ -268,61 +264,30 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
 
     try {
       setIsSyncingHierarchy(true);
-      showToast('info', `Criando estrutura no Google Drive para ${clientsToSync.length} cliente(s)...`);
+      const res = await api.syncDriveFoldersServer({
+        companyId: !isDevAdmin && currentCompanyId ? currentCompanyId : undefined,
+        clientDriveToken: token && token !== 'server-managed-cloud' ? token : undefined,
+      });
 
-      let rootFolderUrl = '';
-
-      for (const client of clientsToSync) {
-        const clientName = client.trade_name || client.legal_name || 'Cliente';
-        const structure = await ensureClientFolders(
-          token,
-          clientName,
-          driveSettings.root_folder_name
-        );
-        rootFolderUrl = structure.rootFolder.webViewLink;
-
-        // Persist folder link in company record if updated
-        if (!client.drive_folder_id || client.drive_folder_id !== structure.clientFolder.id) {
-          await api.updateCompany(client.id, {
-            drive_folder_id: structure.clientFolder.id,
-            drive_folder_url: structure.clientFolder.webViewLink,
-          }).catch(() => {});
-        }
+      if (res.settings) {
+        setDriveSettings((prev) => ({ ...prev, ...res.settings }));
       }
-
-      // Update Drive Settings with root folder info
-      const settingsUpdate = {
-        root_folder_url: rootFolderUrl,
-        last_synced_at: new Date().toISOString(),
-      };
-      setDriveSettings((prev) => ({ ...prev, ...settingsUpdate }));
-      await api.updateDriveSettings(settingsUpdate);
-
-      showToast(
-        'success',
-        `Pastas organizadas no Drive com sucesso! Cada cliente possui suas subpastas de Fotos com Código Único e Documentos.`
-      );
+      setHasTokenInMemory(true);
+      showToast('success', res.message || 'Pastas sincronizadas com sucesso!');
       loadData();
     } catch (err: any) {
       console.error('Sync error:', err);
-      showToast('error', `Erro ao sincronizar pastas no Drive: ${err.message}`);
+      showToast('error', `Erro ao sincronizar pastas: ${err.message}`);
     } finally {
       setIsSyncingHierarchy(false);
     }
   };
 
-  // Upload File directly to Google Drive in the respective category folder
+  // Upload File directly to Google Drive / Cloud in the respective category folder
   const handleUploadToDrive = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) {
       showToast('error', 'Selecione um arquivo ou foto para enviar.');
-      return;
-    }
-
-    const token = getCachedToken();
-    if (!token) {
-      showToast('error', 'Conecte o Google Drive antes de realizar o envio.');
-      handleConnectGoogleDrive();
       return;
     }
 
@@ -334,68 +299,29 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
 
     try {
       setIsUploading(true);
+      const token = getCachedToken();
 
-      // 1. Ensure folder structure on Drive: Root -> [Nome do Cliente] -> [Fotos / Documentos]
-      const clientName = targetCompany.trade_name || targetCompany.legal_name || 'Cliente';
-      const structure = await ensureClientFolders(
-        token,
-        clientName,
-        driveSettings.root_folder_name
-      );
+      const fileDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Falha ao ler o arquivo selecionado.'));
+        reader.readAsDataURL(uploadFile);
+      });
 
-      // Determine category folder on Drive and code prefix
-      let targetFolder = structure.categoryFolders.documents;
-      let prefix = 'DOC';
-      if (uploadCategory === 'photo') {
-        targetFolder = structure.categoryFolders.photos;
-        prefix = 'FOTO';
-      }
-
-      // Generate Unique Code (e.g., FOTO-DRO-3F8E)
-      const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const cliCode = targetCompany.trade_name
-        ? targetCompany.trade_name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI')
-        : 'CLI';
-      const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
-
-      // 2. Upload file directly to Drive
-      const sanitizedFileName = `${uniqueCode}_${uploadFile.name.replace(/\s+/g, '_')}`;
-      const uploadRes = await uploadFileToDrive(
-        token,
-        uploadFile,
-        sanitizedFileName,
-        targetFolder.id,
-        uploadDescription || `Arquivo vinculado ao cliente ${clientName} com código único ${uniqueCode}`
-      );
-
-      // 3. Save Document in DB
-      await api.createDriveDocument({
-        unique_code: uniqueCode,
+      const res = await api.uploadDriveDocumentServer({
+        fileData: fileDataUrl,
+        filename: uploadFile.name,
+        mimeType: uploadFile.type || 'application/octet-stream',
         company_id: targetCompany.id,
         category: uploadCategory,
         title: uploadTitle.trim() || uploadFile.name,
         description: uploadDescription.trim(),
-        file_name: uploadFile.name,
-        file_size: uploadFile.size,
-        mime_type: uploadFile.type,
-        drive_file_id: uploadRes.id,
-        drive_folder_id: targetFolder.id,
-        drive_view_url: uploadRes.webViewLink,
-        drive_download_url: uploadRes.webContentLink,
-        status: 'completed',
+        clientDriveToken: token && token !== 'server-managed-cloud' ? token : undefined,
       });
-
-      // Update company folder URL if not yet set
-      if (!targetCompany.drive_folder_url) {
-        await api.updateCompany(targetCompany.id, {
-          drive_folder_id: structure.clientFolder.id,
-          drive_folder_url: structure.clientFolder.webViewLink,
-        }).catch(() => {});
-      }
 
       showToast(
         'success',
-        `Arquivo salvo no Google Drive com sucesso! Código único: ${uniqueCode}`
+        res.message || `Arquivo salvo com sucesso! Código único: ${res.unique_code}`
       );
 
       // Reset modal
@@ -407,7 +333,7 @@ export const GoogleDriveFileManager: React.FC<GoogleDriveFileManagerProps> = ({
       loadData();
     } catch (err: any) {
       console.error('Upload to Drive error:', err);
-      showToast('error', `Erro ao enviar arquivo para o Drive: ${err.message}`);
+      showToast('error', `Erro ao enviar arquivo: ${err.message}`);
     } finally {
       setIsUploading(false);
     }

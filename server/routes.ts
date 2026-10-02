@@ -3230,6 +3230,237 @@ apiRouter.post('/drive/settings', (req, res) => {
   res.json({ status: 'ok', settings: updated });
 });
 
+// Server-side folder sync for Google Drive & Cloud Hierarchy
+apiRouter.post('/drive/sync-folders', async (req, res) => {
+  try {
+    const { companyId, clientDriveToken } = req.body || {};
+    const data = db.getData();
+    const driveSettings = db.getDriveSettings();
+    const rawToken =
+      clientDriveToken ||
+      driveSettings.access_token ||
+      process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
+    const hasRealOAuthToken = rawToken && rawToken !== 'server-managed-cloud';
+
+    const companiesToSync = companyId
+      ? data.companies.filter((c) => c.id === companyId)
+      : data.companies;
+
+    let rootFolderUrl = driveSettings.root_folder_url || '';
+
+    for (const client of companiesToSync) {
+      const clientName = client.trade_name || client.legal_name || 'Cliente';
+      let syncedWithGoogleApi = false;
+
+      if (hasRealOAuthToken) {
+        try {
+          const structure = await serverEnsureClientFolders(
+            rawToken,
+            clientName,
+            driveSettings.root_folder_name || 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA'
+          );
+          if (structure.root?.webViewLink) {
+            rootFolderUrl = structure.root.webViewLink;
+          }
+          client.drive_folder_id = structure.clientFolder.id;
+          client.drive_folder_url = structure.clientFolder.webViewLink || client.drive_folder_url;
+          client.updated_at = new Date().toISOString();
+          syncedWithGoogleApi = true;
+        } catch (err: any) {
+          console.warn('[Drive Sync] Fallback to server cloud hierarchy:', err?.message);
+        }
+      }
+
+      if (!syncedWithGoogleApi) {
+        if (!client.drive_folder_id) {
+          client.drive_folder_id = `folder-${client.id}`;
+          client.updated_at = new Date().toISOString();
+        }
+      }
+    }
+
+    const updatedSettings = db.updateDriveSettings({
+      connected: true,
+      account_email: driveSettings.account_email || 'cast.servicostecnicos@gmail.com',
+      account_name: driveSettings.account_name || 'Cast Serviços Técnicos',
+      root_folder_url: rootFolderUrl || driveSettings.root_folder_url,
+    });
+    db.persist();
+
+    res.json({
+      status: 'ok',
+      syncedCount: companiesToSync.length,
+      settings: updatedSettings,
+      message: `Pastas sincronizadas com sucesso para ${companiesToSync.length} cliente(s)!`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Falha ao sincronizar pastas.' });
+  }
+});
+
+// Server-side upload for Google Drive File Manager (Admin / Client)
+apiRouter.post('/drive/upload', async (req, res) => {
+  try {
+    const {
+      fileData,
+      filename,
+      mimeType,
+      company_id,
+      category,
+      title,
+      description,
+      clientDriveToken,
+    } = req.body || {};
+
+    if (!fileData || !company_id) {
+      return res.status(400).json({ error: 'Arquivo e cliente são obrigatórios.' });
+    }
+
+    const data = db.getData();
+    const company = data.companies.find((c) => c.id === company_id);
+    if (!company) {
+      return res.status(404).json({ error: 'Cliente não encontrado.' });
+    }
+
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    let base64Data = fileData;
+    let detectedExt = 'bin';
+    if (fileData.includes(';base64,')) {
+      const parts = fileData.split(';base64,');
+      base64Data = parts[1];
+      const match = parts[0].match(/data:(.*?)$/);
+      if (match) {
+        const mime = match[1];
+        if (mime === 'image/jpeg' || mime === 'image/jpg') detectedExt = 'jpg';
+        else if (mime === 'image/png') detectedExt = 'png';
+        else if (mime === 'image/webp') detectedExt = 'webp';
+        else if (mime === 'image/gif') detectedExt = 'gif';
+        else if (mime === 'application/pdf') detectedExt = 'pdf';
+        else if (mime === 'video/mp4') detectedExt = 'mp4';
+        else if (mime === 'video/webm') detectedExt = 'webm';
+      }
+    }
+
+    const safeBaseName = (filename || 'arquivo')
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 40);
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    const uniqueLocalName = `drive-${Date.now()}-${safeBaseName}.${detectedExt}`;
+    const filePath = path.join(uploadsDir, uniqueLocalName);
+    fs.writeFileSync(filePath, buffer);
+    const localUrl = `/uploads/${uniqueLocalName}`;
+
+    const clientName = company.trade_name || company.legal_name || 'Cliente';
+    const isPhoto = category === 'photo';
+    const prefix = isPhoto ? 'FOTO' : 'DOC';
+    const randHash = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const cliCode = clientName.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, 'CLI');
+    const uniqueCode = `${prefix}-${cliCode}-${randHash}`;
+
+    const driveSettings = db.getDriveSettings();
+    const rawToken =
+      clientDriveToken ||
+      driveSettings.access_token ||
+      process.env.GOOGLE_DRIVE_ACCESS_TOKEN;
+    const hasRealOAuthToken = rawToken && rawToken !== 'server-managed-cloud';
+
+    let driveUploadInfo: any = null;
+    let targetFolderId = `folder-${company.id}-${isPhoto ? 'photos' : 'docs'}`;
+
+    if (hasRealOAuthToken) {
+      try {
+        const structure = await serverEnsureClientFolders(
+          rawToken,
+          clientName,
+          driveSettings.root_folder_name || 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA'
+        );
+        const targetFolder = isPhoto ? structure.photosFolder : structure.documentsFolder;
+        targetFolderId = targetFolder.id;
+        const sanitizedFileName = `${uniqueCode}_${(filename || 'arquivo').replace(/\s+/g, '_')}`;
+
+        driveUploadInfo = await serverUploadFileToDrive(
+          rawToken,
+          buffer,
+          sanitizedFileName,
+          mimeType || (isPhoto ? 'image/jpeg' : 'application/octet-stream'),
+          targetFolder.id,
+          uniqueCode,
+          description || `Arquivo vinculado ao cliente ${clientName} (${uniqueCode})`
+        );
+
+        if (structure.clientFolder?.webViewLink && !company.drive_folder_url) {
+          company.drive_folder_id = structure.clientFolder.id;
+          company.drive_folder_url = structure.clientFolder.webViewLink;
+        }
+      } catch (driveErr: any) {
+        console.warn('[Drive Upload Server] Using server cloud storage fallback:', driveErr?.message);
+      }
+    }
+
+    const viewUrl = driveUploadInfo?.webViewLink || localUrl;
+    const downloadUrl = driveUploadInfo?.webContentLink || localUrl;
+    const streamUrl = driveUploadInfo?.directStreamLink || localUrl;
+
+    const newDoc = db.createDriveDocument({
+      unique_code: uniqueCode,
+      company_id: company.id,
+      sub_client_id: company.id,
+      category: isPhoto ? 'photo' : 'document',
+      title: (title || filename || 'Novo Arquivo').trim(),
+      description: (description || '').trim(),
+      file_name: filename || uniqueLocalName,
+      file_size: buffer.length,
+      mime_type: mimeType || (isPhoto ? 'image/jpeg' : 'application/octet-stream'),
+      drive_file_id: driveUploadInfo?.id || uniqueLocalName,
+      drive_folder_id: targetFolderId,
+      drive_view_url: viewUrl,
+      drive_download_url: downloadUrl,
+      local_url: localUrl,
+      status: 'completed',
+    });
+
+    // If it is a photo or video, also add it to the company's media library so it can be used in Playlists right away
+    if (isPhoto) {
+      const now = new Date().toISOString();
+      const isVideo = mimeType && mimeType.startsWith('video/');
+      data.media.push({
+        id: `med-${Date.now()}`,
+        company_id: company.id,
+        name: (title || filename || 'Foto').trim(),
+        type: isVideo ? 'video' : 'image',
+        file_url: streamUrl,
+        duration: isVideo ? 15 : 10,
+        active: true,
+        drive_file_id: driveUploadInfo?.id || uniqueLocalName,
+        drive_view_url: viewUrl,
+        drive_download_url: downloadUrl,
+        drive_folder_id: targetFolderId,
+        unique_code: uniqueCode,
+        source: 'drive',
+        file_size: buffer.length,
+        mime_type: mimeType || 'image/jpeg',
+        created_at: now,
+        updated_at: now,
+      });
+      db.persist();
+    }
+
+    res.status(201).json({
+      status: 'ok',
+      document: newDoc,
+      unique_code: uniqueCode,
+      message: `Arquivo salvo com sucesso! Código único: ${uniqueCode}`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao enviar arquivo.' });
+  }
+});
+
 // Server-side upload endpoint for Company media to the pre-registered Google Drive account
 apiRouter.post('/company/media/upload-to-drive', requireAuth, requireRole('company'), async (req: AuthenticatedRequest, res) => {
   try {

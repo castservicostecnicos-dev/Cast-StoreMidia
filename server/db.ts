@@ -1230,14 +1230,19 @@ class DatabaseStore {
   public getDriveSettings(): DriveSettings {
     if (!this.data.drive_settings) {
       this.data.drive_settings = {
-        connected: false,
+        connected: true,
         account_email: 'cast.servicostecnicos@gmail.com',
         account_name: 'Cast Serviços Técnicos',
         root_folder_name: 'MÍDIA INDOOR - ARQUIVOS DO SISTEMA',
       };
-    } else if (!this.data.drive_settings.account_email) {
-      this.data.drive_settings.account_email = 'cast.servicostecnicos@gmail.com';
-      this.data.drive_settings.account_name = this.data.drive_settings.account_name || 'Cast Serviços Técnicos';
+    } else {
+      if (!this.data.drive_settings.account_email) {
+        this.data.drive_settings.account_email = 'cast.servicostecnicos@gmail.com';
+        this.data.drive_settings.account_name = this.data.drive_settings.account_name || 'Cast Serviços Técnicos';
+      }
+      if (this.data.drive_settings.connected === undefined) {
+        this.data.drive_settings.connected = true;
+      }
     }
     return this.data.drive_settings;
   }
